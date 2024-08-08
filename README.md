@@ -407,7 +407,7 @@ dictionary AIRewriterCreateOptions {
   DOMString sharedContext;
   AIRewriterTone tone = "as-is";
   AIRewriterFormat format = "as-is";
-  AIRewriterLengthHint length = "as-is";
+  AIRewriterLength length = "as-is";
 };
 
 dictionary AIRewriterRewriteOptions {
