@@ -1,12 +1,13 @@
 name: CI
 on:
-  pull_request: {}
+  pull_request:
+    branches: [main]
   push:
     branches: [main]
 jobs:
   main:
     name: Build, Validate and Deploy
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
