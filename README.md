@@ -217,14 +217,19 @@ const rewriter = await ai.rewriter.create({ signal: controller.signal });
 await rewriter.rewrite(document.body.textContent, { signal: controller.signal });
 ```
 
-Additionally, the summarizer/writer/rewriter objects themselves have a `destroy()` method. Calling this method will:
+Additionally, the summarizer/writer/rewriter objects themselves have a `destroy()` method, which is a convenience method with equivalent behavior for cases where the summarizer/writer/rewriter object has already been created.
 
-* Abort any ongoing downloads or loading process for the model.
-* Reject any ongoing one-shot operations (`summarize()`, `write()`, or `rewrite()`) with a `"AbortError"` `DOMException`.
-* Error any `ReadableStream`s returned by the streaming operations with a `"AbortError"` `DOMException`.
+Destroying a summarizer/writer/rewriter will:
+
+* Reject any ongoing one-shot operations (`summarize()`, `write()`, or `rewrite()`).
+* Error any `ReadableStream`s returned by the streaming operations.
 * And, most importantly, allow the user agent to unload the machine learning models from memory. (If no other APIs are using them.)
 
-This method is mainly used as a mechanism to free up the memory used by the language model without waiting for garbage collection, since models can be quite large.
+Allowing such destruction provides a way to free up the memory used by the language model without waiting for garbage collection, since models can be quite large.
+
+Aborting the creation process will reject the promise returned by `create()`, and will also stop signaling any ongoing download progress. (The browser may then abort the downloads, or may continue them. Either way, no further `downloadprogress` events will be fired.)
+
+In all cases, the exception used for rejecting promises or erroring `ReadableStream`s will be an `"AbortError"` `DOMException`, or the given abort reason.
 
 ## Detailed design
 
