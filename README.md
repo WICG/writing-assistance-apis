@@ -136,10 +136,9 @@ A created summarizer/writer/rewriter object can be used multiple times. **The on
 const summarizer = await ai.summarize.create({ type: "tl;dr" });
 
 const reviewSummaries = await Promise.all(
-  Array.from(
-    document.querySelectorAll("#reviews > .review"),
-    reviewEl => summarizer.summarize(reviewEl.textContent)
-  )
+  Array.from(document.querySelectorAll("#reviews > .review")).map((reviewEl) => {
+    return summarizer.summarize(reviewEl.textContent);
+  }),
 );
 ```
 
