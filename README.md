@@ -357,7 +357,7 @@ dictionary AIWriterCreateOptions {
   AICreateMonitorCallback monitor;
 
   DOMString sharedContext;
-  AIWriterTone tone = "key-points",
+  AIWriterTone tone = "neutral",
   AIWriterFormat format = "markdown",
   AIWriterLength length = "short"
 };
