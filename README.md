@@ -107,7 +107,7 @@ const rewriter = await ai.rewriter.create({
   sharedContext: "A review for the Flux Capacitor 3000 from TimeMachines Inc."
 });
 
-const result = await writer.rewrite(reviewEl.textContent, {
+const result = await rewriter.rewrite(reviewEl.textContent, {
   context: "Avoid any toxic language and be as constructive as possible."
 });
 ```
