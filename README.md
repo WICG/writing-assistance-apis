@@ -445,6 +445,15 @@ However, the capabilities object does *not* proactively update in response to wh
 
 Note that to ensure that the browser can give accurate answers while `available` is `"after-download"`, the browser must ship some notion of what types/formats/input languages/etc. are available with the browser. In other words, the browser cannot download this information at the same time it downloads the language model. This could be done either by bundling that information with the browser binary, or via some out-of-band update mechanism that proactively stays up to date.
 
+### Specifications and tests
+
+[As the W3C mentions](https://www.w3.org/reports/ai-web-impact/#interop), it is as-yet unclear how much interoperability we can achieve on the writing assistance APIs, and how best to capture that in the usual vehicles like specifications and web platform tests. However, we are excited to explore this space and do our best to produce useful artifacts that encourage interoperability. Some early examples of the sort of things we are thinking about:
+
+* We can give detailed specifications for all the non-output parts of the API, e.g. download signals, behavior in error cases, and the capabilities invariants.
+* It should be possible to specify and test that rewriting text to be `"shorter"`/`"longer"`, actually produces fewer/more code points.
+* We can specify and test that summarizing to `"key-points"` should produce bulleted lists, or that `"headline"`s should not be more than one sentence.
+* We could consider collaboratively developing machine learning "evals" to judge how successful at a given writing assistance task an implementation is. This is a well-studied field with lots of prior art to draw from.
+
 ## Alternatives considered and under consideration
 
 ### Summarization as a type of rewriting
@@ -484,6 +493,16 @@ In [the TAG review of the translation and language detection APIs](https://githu
 Similarly, in [an issue on the translation and language detection APIs repository](https://github.com/WICG/translation-api/issues/12), a member of the W3C Internationalization Working Group suggested that the word "readily" might not be understood easily by non-native English speakers, and something less informative but more common (such as "yes") might be better. And in [another issue](https://github.com/WICG/translation-api/issues/7), we're wondering if the empty string would be better than `"no"`, since the empty string is falsy.
 
 We are open to such surface-level tweaks to the API entry points, and intend to gather more data from web developers on what they find more understandable and clear.
+
+### Directly exposing a "prompt API"
+
+The same team that is working on these APIs is also prototyping an experimental [prompt API](https://github.com/explainers-by-googlers/prompt-api/). A natural question is how these efforts related. Couldn't one easily accomplish summarization/writing/rewriting by directly prompting a language model, thus making these higher-level APIs redundant?
+
+We currently believe higher-level APIs have a better chance of producing interoperability, as they make it more difficult to rely on the specifics of a model's capabilities, knowledge, or output formatting. [explainers-by-googlers/prompt-api#35](https://github.com/explainers-by-googlers/prompt-api/issues/35) contains specific illustrations of the potential interoperability problems with a raw prompt API. (It also contains a possible solution, which we are exploring!) When only specific use cases are targeted, implementations can more predictably produce similar output, that always works well enough to be usable by web developers regardless of which implementation is in play. This is similar to how other APIs backed by machine learning models work, such as the [shape detection API](https://wicg.github.io/shape-detection-api/) or the proposed [translator and language detector APIs](https://github.com/WICG/translation-api).
+
+Another reason to favor higher-level APIs is that it is possible to produce better results with them than with a raw prompt API, by fine-tuning the model on the specific tasks and configurations that are offered. They can also encapsulate the application of more advanced techniques, e.g. hierarchical summarization and prefix caching; see [this comment](https://github.com/WICG/proposals/issues/163#issuecomment-2297913033) from a web developer on their experience on the complexity of real-world summarization tasks.
+
+For the time being, the Chrome built-in AI team is moving forward more aggresively with the writing assistance APIs (as well as the translator and language detector APIs), with the next milestone being [origin trials](https://developer.chrome.com/docs/web-platform/origin-trials). Notably, all such APIs have been moved to the WICG for incubation in the web standards space. The prompt API remains extra-experimental, with its next milestone being [experimentation only within Chrome Extensions](https://developer.chrome.com/blog/august2024-built-in-ai?hl=en#prompt_api_in_chrome_extensions).
 
 ## Privacy considerations
 
