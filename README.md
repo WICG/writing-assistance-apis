@@ -500,7 +500,7 @@ The same team that is working on these APIs is also prototyping an experimental 
 
 We currently believe higher-level APIs have a better chance of producing interoperability, as they make it more difficult to rely on the specifics of a model's capabilities, knowledge, or output formatting. [explainers-by-googlers/prompt-api#35](https://github.com/explainers-by-googlers/prompt-api/issues/35) contains specific illustrations of the potential interoperability problems with a raw prompt API. (It also contains a possible solution, which we are exploring!) When only specific use cases are targeted, implementations can more predictably produce similar output, that always works well enough to be usable by web developers regardless of which implementation is in play. This is similar to how other APIs backed by machine learning models work, such as the [shape detection API](https://wicg.github.io/shape-detection-api/) or the proposed [translator and language detector APIs](https://github.com/WICG/translation-api).
 
-Another reason to favor higher-level APIs is that it is possible to produce better results with them than with a raw prompt API, by fine-tuning the model on the specific tasks and configurations that are offered. They can also encapsulate the application of more advanced techniques, e.g. hierarchical summarization and prefix caching; see [this comment](https://github.com/WICG/proposals/issues/163#issuecomment-2297913033) from a web developer on their experience on the complexity of real-world summarization tasks.
+Another reason to favor higher-level APIs is that it is possible to produce better results with them than with a raw prompt API, by fine-tuning the model on the specific tasks and configurations that are offered. They can also encapsulate the application of more advanced techniques, e.g. hierarchical summarization and prefix caching; see [this comment](https://github.com/WICG/proposals/issues/163#issuecomment-2297913033) from a web developer regarding their experience of the complexity of real-world summarization tasks.
 
 For the time being, the Chrome built-in AI team is moving forward more aggresively with the writing assistance APIs (as well as the translator and language detector APIs), with the next milestone being [origin trials](https://developer.chrome.com/docs/web-platform/origin-trials). Notably, all such APIs have been moved to the WICG for incubation in the web standards space. The prompt API remains extra-experimental, with its next milestone being [experimentation only within Chrome Extensions](https://developer.chrome.com/blog/august2024-built-in-ai?hl=en#prompt_api_in_chrome_extensions).
 
@@ -532,10 +532,9 @@ It's also worth noting that a download cannot be evicted by web developers. Thus
 
 ## Stakeholder feedback
 
-* W3C TAG: not yet requested
+* W3C TAG: [w3ctag/design-reviews#991](https://github.com/w3ctag/design-reviews/issues/991)
 * Browser engines and browsers:
-  * Chromium: prototyping behind a flag
-  * Gecko: not yet requested
-  * WebKit: not yet requested
-  * Edge: not yet requested
-* Web developers: no public signals yet; will be updated as we get permission to share such signals
+  * Chromium: prototyping behind a flag ([summarizer](https://chromestatus.com/feature/5193953788559360), [writer](https://chromestatus.com/feature/4712595362414592), [rewriter](https://chromestatus.com/feature/5112320150470656))
+  * Gecko: [mozilla/standards-positions#1067](https://github.com/mozilla/standards-positions/issues/1067)
+  * WebKit: [WebKit/standards-positions#393](https://github.com/WebKit/standards-positions/issues/393)
+* Web developers: some discussion in [WICG/proposals#163](https://github.com/WICG/proposals/issues/163)
