@@ -243,17 +243,17 @@ The API design here is synchronized with [that of the translation and language d
 // Shared self.ai APIs
 
 partial interface WindowOrWorkerGlobalScope {
-  [Replaceable] readonly attribute AI ai;
+  [Replaceable, SecureContext] readonly attribute AI ai;
 };
 
-[Exposed=(Window,Worker)]
+[Exposed=(Window,Worker), SecureContext]
 interface AI {
   readonly attribute AISummarizerFactory summarizer;
   readonly attribute AIWriterFactory writer;
   readonly attribute AIRewriterFactory rewriter;
 };
 
-[Exposed=(Window,Worker)]
+[Exposed=(Window,Worker), SecureContext]
 interface AICreateMonitor : EventTarget {
   attribute EventHandler ondownloadprogress;
 
@@ -269,13 +269,13 @@ enum AICapabilityAvailability { "readily", "after-download", "no" };
 ```webidl
 // Summarizer
 
-[Exposed=(Window,Worker)]
+[Exposed=(Window,Worker), SecureContext]
 interface AISummarizerFactory {
   Promise<AISummarizer> create(optional AISummarizerCreateOptions options = {});
   Promise<AISummarizerCapabilities> capabilities();
 };
 
-[Exposed=(Window,Worker)]
+[Exposed=(Window,Worker), SecureContext]
 interface AISummarizer {
   Promise<DOMString> summarize(DOMString input, optional AISummarizerSummarizeOptions options = {});
   ReadableStream summarizeStreaming(DOMString input, optional AISummarizerSummarizeOptions options = {});
@@ -288,7 +288,7 @@ interface AISummarizer {
   undefined destroy();
 };
 
-[Exposed=(Window,Worker)]
+[Exposed=(Window,Worker), SecureContext]
 interface AISummarizerCapabilities {
   readonly attribute AICapabilityAvailability available;
 
@@ -322,13 +322,13 @@ enum AISummarizerLength { "short", "medium", "long" };
 ```webidl
 // Writer
 
-[Exposed=(Window,Worker)]
+[Exposed=(Window,Worker), SecureContext]
 interface AIWriterFactory {
   Promise<AIWriter> create(optional AIWriterCreateOptions options = {});
   Promise<AIWriterCapabilities> capabilities();
 };
 
-[Exposed=(Window,Worker)]
+[Exposed=(Window,Worker), SecureContext]
 interface AIWriter {
   Promise<DOMString> write(DOMString writingTask, optional AIWriterWriteOptions options = {});
   ReadableStream writeStreaming(DOMString writingTask, optional AIWriterWriteOptions options = {});
@@ -341,7 +341,7 @@ interface AIWriter {
   undefined destroy();
 };
 
-[Exposed=(Window,Worker)]
+[Exposed=(Window,Worker), SecureContext]
 interface AIWriterCapabilities {
   readonly attribute AICapabilityAvailability available;
 
@@ -375,13 +375,13 @@ enum AIWriterLength { "short", "medium", "long" };
 ```webidl
 // Rewriter
 
-[Exposed=(Window,Worker)]
+[Exposed=(Window,Worker), SecureContext]
 interface AIRewriterFactory {
   Promise<AIRewriter> create(optional AIRewriterCreateOptions options = {});
   Promise<AIRewriterCapabilities> capabilities();
 };
 
-[Exposed=(Window,Worker)]
+[Exposed=(Window,Worker), SecureContext]
 interface AIRewriter {
   Promise<DOMString> rewrite(DOMString input, optional AIRewriterRewriteOptions options = {});
   ReadableStream rewriteStreaming(DOMString input, optional AIRewriterRewriteOptions options = {});
@@ -394,7 +394,7 @@ interface AIRewriter {
   undefined destroy();
 };
 
-[Exposed=(Window,Worker)]
+[Exposed=(Window,Worker), SecureContext]
 interface AIRewriterCapabilities {
   readonly attribute AICapabilityAvailability available;
 
