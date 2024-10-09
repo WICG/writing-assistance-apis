@@ -157,7 +157,7 @@ Each of these capabilities objects has further methods which allow probing the s
 
 ```js
 const summarizerCapabilities = await ai.summarizer.capabilities();
-const supportsTeaser = summarizerCapabilities.supportsType("teaser");
+const supportsTeaser = summarizerCapabilities.createOptionsAvailable({ type: "teaser" });
 
 if (supportsTeaser !== "no") {
   // We're good! Let's do the summarization using the built-in API.
@@ -174,7 +174,7 @@ if (supportsTeaser !== "no") {
 }
 ```
 
-In addition to methods to check if options (like `type` for summarizer, or `tone` for rewriter) are supported, all three APIs' capabilities objects have an additional method, `supportsInputLanguage(languageTag)`, which can be used to tell whether the model supports input and context in the given human language. It has the same three return values.
+In addition to methods to check if options (like `type` for summarizer, or `tone` for rewriter) are supported, all three APIs' capabilities objects have an additional method, `languageAvailable(languageTag)`, which can be used to tell whether the model supports input and context in the given human language. It has the same three return values.
 
 ### Download progress
 
@@ -292,21 +292,21 @@ interface AISummarizer {
 interface AISummarizerCapabilities {
   readonly attribute AICapabilityAvailability available;
 
-  AICapabilityAvailability supportsType(AISummarizerType type);
-  AICapabilityAvailability supportsFormat(AISummarizerFormat format);
-  AICapabilityAvailability supportsLength(AISummarizerLength length);
-
-  AICapabilityAvailability supportsInputLanguage(DOMString languageTag);
+  AICapabilityAvailability createOptionsAvailable(AISummarizerCreateCoreOptions options);
+  AICapabilityAvailability languageAvailable(DOMString languageTag);
 };
 
-dictionary AISummarizerCreateOptions {
+dictionary AISummarizerCreateCoreOptions {
+  AISummarizerType type = "key-points";
+  AISummarizerFormat format = "markdown";
+  AISummarizerLength length = "short";
+};
+
+dictionary AISummarizerCreateOptions : AISummarizerCreateCoreOptions {
   AbortSignal signal;
   AICreateMonitorCallback monitor;
 
   DOMString sharedContext;
-  AISummarizerType type = "key-points";
-  AISummarizerFormat format = "markdown";
-  AISummarizerLength length = "short";
 };
 
 dictionary AISummarizerSummarizeOptions {
@@ -345,21 +345,21 @@ interface AIWriter {
 interface AIWriterCapabilities {
   readonly attribute AICapabilityAvailability available;
 
-  AICapabilityAvailability supportsTone(AIWriterTone tone);
-  AICapabilityAvailability supportsFormat(AIWriterFormat format);
-  AICapabilityAvailability supportsLength(AIWriterLength length);
-
-  AICapabilityAvailability supportsInputLanguage(DOMString languageTag);
+  AICapabilityAvailability createOptionsAvailable(AIWriterCreateCoreOptions options);
+  AICapabilityAvailability languageAvailable(DOMString languageTag);
 };
 
-dictionary AIWriterCreateOptions {
+dictionary AIWriterCreateCoreOptions {
+  AIWriterTone tone = "neutral",
+  AIWriterFormat format = "markdown",
+  AIWriterLength length = "short"
+};
+
+dictionary AIWriterCreateOptions : AIWriterCreateCoreOptions {
   AbortSignal signal;
   AICreateMonitorCallback monitor;
 
   DOMString sharedContext;
-  AIWriterTone tone = "neutral",
-  AIWriterFormat format = "markdown",
-  AIWriterLength length = "short"
 };
 
 dictionary AIWriterWriteOptions {
@@ -398,21 +398,21 @@ interface AIRewriter {
 interface AIRewriterCapabilities {
   readonly attribute AICapabilityAvailability available;
 
-  AICapabilityAvailability supportsTone(AIRewriterTone tone);
-  AICapabilityAvailability supportsFormat(AIRewriterFormat format);
-  AICapabilityAvailability supportsLength(AIRewriterLength length);
-
-  AICapabilityAvailability supportsInputLanguage(DOMString languageTag);
+  AICapabilityAvailability createOptionsAvailable(AIRewriterCreateCoreOptions options);
+  AICapabilityAvailability languageAvailable(DOMString languageTag);
 };
 
-dictionary AIRewriterCreateOptions {
+dictionary AIRewriterCreateCoreOptions {
+  AIRewriterTone tone = "as-is";
+  AIRewriterFormat format = "as-is";
+  AIRewriterLength length = "as-is";
+};
+
+dictionary AIRewriterCreateOptions : AIRewriterCreateCoreOptions {
   AbortSignal signal;
   AICreateMonitorCallback monitor;
 
   DOMString sharedContext;
-  AIRewriterTone tone = "as-is";
-  AIRewriterFormat format = "as-is";
-  AIRewriterLength length = "as-is";
 };
 
 dictionary AIRewriterRewriteOptions {
