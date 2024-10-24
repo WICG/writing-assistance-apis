@@ -1,21 +1,384 @@
-<pre class='metadata'>
+<pre class="metadata">
 Title: Writing Assistance APIs
 Shortname: writing-assistance
 Level: None
-Status: w3c/UD
-Repository: explainers-by-googlers/writing-assistance-apis
-URL: https://explainers-by-googlers.github.io/writing-assistance-apis
+Status: CG-DRAFT
+Group: WICG
+Repository: WICG/writing-assistance-apis
+URL: https://wicg.github.io/writing-assistance-apis
 Editor: Domenic Denicola, Google https://www.google.com/, d@domenic.me, https://domenic.me/
 Abstract: The summarizer, writer, and rewriter APIs provide high-level interfaces to call on a browser or operating system's built-in language model to help with writing tasks.
 Markup Shorthands: markdown yes, css no
 Complain About: accidental-2119 yes, missing-example-ids yes
 Assume Explicit For: yes
-Die On: warning
 Default Biblio Status: current
 Boilerplate: omit conformance
+Indent: 2
+Die On: warning
 </pre>
 
-Introduction {#intro}
-=====================
+<pre class="link-defaults">
+spec:infra; type:dfn; text:user agent
+</pre>
+
+<style>
+dl.props { display: grid; grid-template-columns: max-content auto; row-gap: 0.25em; column-gap: 1em; }
+dl.props > dt { grid-column-start: 1; margin: 0; }
+dl.props > dd { grid-column-start: 2; margin: 0; }
+p + dl.props { margin-top: -0.5em; }
+</style>
+
+<h2 id="intro">Introduction</h2>
 
 For now, see the [explainer]([REPOSITORYURL]).
+
+<h2 id="shared-ai-api">Shared AI APIs and infrastructure</h2>
+
+<xmp class="idl">
+partial interface WindowOrWorkerGlobalScope {
+  [Replaceable, SecureContext] readonly attribute AI ai;
+};
+
+[Exposed=(Window,Worker), SecureContext]
+interface AI {};
+
+[Exposed=(Window,Worker), SecureContext]
+interface AICreateMonitor : EventTarget {
+  attribute EventHandler ondownloadprogress;
+};
+
+callback AICreateMonitorCallback = undefined (AICreateMonitor monitor);
+
+enum AICapabilityAvailability { "readily", "after-download", "no" };
+</xmp>
+
+Each {{WindowOrWorkerGlobalScope}} has an <dfn for="WindowOrWorkerGlobalScope">AI namespace</dfn>, an {{AI}} object. Upon creation of the {{WindowOrWorkerGlobalScope}} object, its [=WindowOrWorkerGlobalScope/AI namespace=] must be set to a [=new=] {{AI}} object created in the {{WindowOrWorkerGlobalScope}} object's [=relevant realm=].
+
+The <dfn attribute for="WindowOrWorkerGlobalScope">ai</dfn> getter steps are to return [=this=]'s [=WindowOrWorkerGlobalScope/AI namespace=].
+
+<hr>
+
+[=Tasks=] queued by this specification use the <dfn>AI task source</dfn>.
+
+<hr>
+
+The following are the [=event handlers=] (and their corresponding [=event handler event types=]) that must be supported, as [=event handler IDL attributes=], by all {{AICreateMonitor}} objects:
+
+<table>
+  <thead>
+    <tr>
+      <th>[=Event handler=]
+      <th>[=Event handler event type=]
+  <tbody>
+    <tr>
+      <td><dfn attribute for="AICreateMonitor">ondownloadprogress</dfn>
+      <td><dfn event for="AICreateMonitor">downloadprogress</dfn>
+</table>
+
+<h2 id="summarizer-api">The summarizer API</h2>
+
+<xmp class="idl">
+partial interface AI {
+  readonly attribute AISummarizerFactory summarizer;
+};
+
+[Exposed=(Window,Worker), SecureContext]
+interface AISummarizerFactory {
+  Promise<AISummarizer> create(optional AISummarizerCreateOptions options = {});
+  Promise<AISummarizerCapabilities> capabilities();
+};
+
+[Exposed=(Window,Worker), SecureContext]
+interface AISummarizer {
+  Promise<DOMString> summarize(DOMString input, optional AISummarizerSummarizeOptions options = {});
+  ReadableStream summarizeStreaming(DOMString input, optional AISummarizerSummarizeOptions options = {});
+
+  readonly attribute DOMString sharedContext;
+  readonly attribute AISummarizerType type;
+  readonly attribute AISummarizerFormat format;
+  readonly attribute AISummarizerLength length;
+
+  undefined destroy();
+};
+
+[Exposed=(Window,Worker), SecureContext]
+interface AISummarizerCapabilities {
+  readonly attribute AICapabilityAvailability available;
+
+  AICapabilityAvailability createOptionsAvailable(optional AISummarizerCreateCoreOptions options = {});
+  AICapabilityAvailability languageAvailable(DOMString languageTag);
+};
+
+dictionary AISummarizerCreateCoreOptions {
+  AISummarizerType type = "key-points";
+  AISummarizerFormat format = "markdown";
+  AISummarizerLength length = "short";
+};
+
+dictionary AISummarizerCreateOptions : AISummarizerCreateCoreOptions {
+  AbortSignal signal;
+  AICreateMonitorCallback monitor;
+
+  DOMString sharedContext;
+};
+
+dictionary AISummarizerSummarizeOptions {
+  AbortSignal signal;
+  DOMString context;
+};
+
+enum AISummarizerType { "tl;dr", "key-points", "teaser", "headline" };
+enum AISummarizerFormat { "plain-text", "markdown" };
+enum AISummarizerLength { "short", "medium", "long" };
+</xmp>
+
+Each {{AI}} has an <dfn for="AI">summarizer factory</dfn>, an {{AISummarizerFactory}} object. Upon creation of the {{AI}} object, its [=AI/summarizer factory=] must be set to a [=new=] {{AISummarizerFactory}} object created in the {{AI}} object's [=relevant realm=].
+
+The <dfn attribute for="AI">summarizer</dfn> getter steps are to return [=this=]'s [=AI/summarizer factory=].
+
+<h3 id="summarizer-creation">Creation</h3>
+
+<div algorithm>
+  The <dfn method for="AISummarizerFactory">create(|options|)</dfn> method steps are:
+
+  1. If [=this=]'s [=relevant global object=] is a {{Window}} whose [=associated Document=] is not [=Document/fully active=], then return [=a promise rejected with=] an "{{InvalidStateError}}" {{DOMException}}.
+
+  1. If |options|["{{AISummarizerCreateOptions/signal}}"] [=map/exists=] and is [=AbortSignal/aborted=], then return [=a promise rejected with=] |options|["{{AISummarizerCreateOptions/signal}}"]'s [=AbortSignal/abort reason=].
+
+  1. Let |fireProgressEvent| be an algorithm taking two arguments that does nothing.
+
+  1. If |options|["{{AISummarizerCreateOptions/monitor}}"] [=map/exists=], then:
+
+    1. Let |monitor| be a [=new=] {{AICreateMonitor}} created in [=this=]'s [=relevant realm=].
+
+    1. [=Invoke=] |options|["{{AISummarizerCreateOptions/monitor}}"] with « |monitor| » and "`rethrow`".
+
+      If an exception |e| is thrown, return [=a promise rejected with=] |e|.
+
+    1. Set |fireProgressEvent| to an algorithm taking arguments |loaded| and |total|, which performs the following steps:
+
+      1. [=Assert=]: this algorithm is running [=in parallel=].
+
+      1. [=Queue a global task=] on the [=AI task source=] given [=this=]'s [=relevant global object=] to perform the following steps:
+
+        1. [=Fire an event=] named {{AICreateMonitor/downloadprogress}} at |monitor|, using {{ProgressEvent}}, with the {{ProgressEvent/loaded}} attribute initialized to |loaded|, the {{ProgressEvent/total}} attribute initialized to |total|, and the {{ProgressEvent/lengthComputable}} attribute initialized to true.
+
+  1. Let |abortedDuringDownload| be false.
+
+    <p class="note">This variable will be written to from the [=event loop=], but read from [=in parallel=].
+
+  1. If |options|["{{AISummarizerCreateOptions/signal}}"] [=map/exists=], then [=AbortSignal/add|add the following abort steps=] to |options|["{{AISummarizerCreateOptions/signal}}"]:
+
+    1. Set |abortedDuringDownload| to true.
+
+  1. Let |promise| be [=a new promise=] created in [=this=]'s [=relevant realm=].
+
+  1. [=In parallel=]:
+
+    1. Let |availability| be the [=current summarizer capability value=] given |options|["{{AISummarizerCreateCoreOptions/type}}"], |options|["{{AISummarizerCreateCoreOptions/format}}"], and |options|["{{AISummarizerCreateCoreOptions/length}}"].
+
+    1. Switch on |availability|:
+
+    <dl class="switch">
+      : "{{AICapabilityAvailability/no}}"
+      ::
+        1. [=Reject=] |promise| with a "{{NotSupportedError}}" {{DOMException}}.
+
+        1. Abort these steps.
+
+      : "{{AICapabilityAvailability/readily}}"
+      ::
+        1. If [=initializing the summarization model=] given |promise| and |options| returns false, then abort these steps.
+
+        1. Let |totalBytes| be the total size of the previously-downloaded summarization capabilities, in bytes.
+
+        1. [=Assert=]: |totalBytes| is greater than 0.
+
+        1. Perform |fireProgressEvent| given 0 and |totalBytes|.
+
+        1. Perform |fireProgressEvent| given |totalBytes| and |totalBytes|.
+
+        1. [=Finalize summarizer creation=] given |promise| and |options|.
+
+      : "{{AICapabilityAvailability/after-download}}"
+      ::
+        1. Initiate the download process for everything the user agent needs to summarize text according to |options|["{{AISummarizerCreateCoreOptions/type}}"], |options|["{{AISummarizerCreateCoreOptions/format}}"], or |options|["{{AISummarizerCreateCoreOptions/length}}"].
+
+        1. Run the following steps, by [=abort when=] |abortedDuringDownload| becomes true:
+
+          1. Wait for the total number of bytes to be downloaded to become determined, and let that number be |totalBytes|.
+
+          1. Let |lastProgressTime| be the [=monotonic clock=]'s [=monotonic clock/unsafe current time=].
+
+          1. Perform |fireProgressEvent| given 0 and |totalBytes|.
+
+          1. While true:
+
+            1. If one or more bytes have been downloaded, then:
+
+              1. If the [=monotonic clock=]'s [=monotonic clock/unsafe current time=] minus |lastProgressTime| is greater than 50 ms, then:
+
+                1. Let |bytesSoFar| be the number of bytes downloaded so far.
+
+                1. [=Assert=]: |bytesSoFar| is greater than 0 and less than or equal to |totalBytes|.
+
+                1. Perform |fireProgressEvent| given |bytesSoFar| and |totalBytes|.
+
+                1. If |bytesSoFar| equals |totalBytes|, then [=iteration/break=].
+
+                1. Set |lastProgressTime| to the [=monotonic clock=]'s [=monotonic clock/unsafe current time=].
+
+            1. Otherwise, if downloading has failed and cannot continue, then:
+
+              1. [=Queue a global task=] on the [=AI task source=] given [=this=]'s [=relevant global object=] to [=reject=] |promise| with a "{{NetworkError}}" {{DOMException}}.
+
+              1. Abort these steps.
+
+        1. [=If aborted=], then:
+          1. [=Queue a global task=] on the [=AI task source=] given [=this=]'s [=relevant global object=] to perform the following steps:
+
+            1. [=Assert=]: |options|["{{AISummarizerCreateOptions/signal}}"]'s is [=AbortSignal/aborted=].
+
+            1. [=Reject=] |promise| with |options|["{{AISummarizerCreateOptions/signal}}"]'s [=AbortSignal/abort reason=].
+
+          1. Abort these steps.
+
+        1. If [=initializing the summarization model=] given |promise| and |options| returns false, then abort these steps.
+
+        1. [=Finalize summarizer creation=] given |promise| and |options|.
+    </dl>
+
+  1. Return |promise|.
+</div>
+
+<div algorithm>
+  To <dfn>initialize the summarization model</dfn>, given a {{Promise}} |promise| and an {{AISummarizerCreateOptions}} |options|:
+
+  1. [=Assert=]: these steps are running [=in parallel=].
+
+  1. Perform any necessarily initialization operations for the AI model backing the [=user agent=]'s summarization capabilities.
+
+    This could include loading the model into memory, loading |options|["{{AISummarizerCreateOptions/sharedContext}}"] into the model's context window, or loading any fine-tunings necessary to support |options|["{{AISummarizerCreateCoreOptions/type}}"], |options|["{{AISummarizerCreateCoreOptions/format}}"], or |options|["{{AISummarizerCreateCoreOptions/length}}"].
+
+  1. If initialization failed for any reason, then:
+
+    1. [=Queue a global task=] on the [=AI task source=] given |promise|'s [=relevant global object=] to [=reject=] |promise| with an "{{OperationError}}" {{DOMException}}.
+
+    1. Return false.
+
+  1. Return true.
+</div>
+
+<div algorithm>
+  To <dfn>finalize summarizer creation</dfn>, given a {{Promise}} |promise| and an {{AISummarizerCreateOptions}} |options|:
+
+  1. [=Assert=]: these steps are running [=in parallel=].
+
+  1. [=Assert=]: the [=current summarizer capability value=] for |options|["{{AISummarizerCreateCoreOptions/type}}"], |options|["{{AISummarizerCreateCoreOptions/format}}"], and |options|["{{AISummarizerCreateCoreOptions/length}}"] is "{{AICapabilityAvailability/readily}}".
+
+  1. [=Queue a global task=] on the [=AI task source=] given |promise|'s [=relevant global object=] to perform the following steps:
+
+    1. If |options|["{{AISummarizerCreateOptions/signal}}"] [=map/exists=] and is [=AbortSignal/aborted=], then:
+
+      1. [=Reject=] |promise| with |options|["{{AISummarizerCreateOptions/signal}}"]'s [=AbortSignal/abort reason=].
+
+      1. Abort these steps.
+
+      <p class="note">This check is necessary in case any code running on the [=agent/event loop=] caused the {{AbortSignal}} to become [=AbortSignal/aborted=] before this [=task=] ran.
+
+    1. Let |summarizer| be a new {{AISummarizer}} object, created in |promise|'s [=relevant realm=], with
+
+      <dl class="props">
+        : [=AISummarizer/shared context=]
+        :: |options|["{{AISummarizerCreateOptions/sharedContext}}"]
+
+        : [=AISummarizer/summary type=]
+        :: |options|["{{AISummarizerCreateCoreOptions/type}}"]
+
+        : [=AISummarizer/summary format=]
+        :: |options|["{{AISummarizerCreateCoreOptions/format}}"]
+
+        : [=AISummarizer/summary length=]
+        :: |options|["{{AISummarizerCreateCoreOptions/length}}"]
+      </dl>
+
+    1. If |options|["{{AISummarizerCreateOptions/signal}}"] [=map/exists=], then [=AbortSignal/add|add the following abort steps=] to |options|["{{AISummarizerCreateOptions/signal}}"]:
+
+      1. [=AISummarizer/Destroy=] |summarizer| with |options|["{{AISummarizerCreateOptions/signal}}"]'s [=AbortSignal/abort reason=].
+
+    1. [=Resolve=] |promise| with |summarizer|.
+</div>
+
+<h3 id="summarizer-capabilities">Capabilities</h3>
+
+TODO algorithm for the creation of {{AISummarizerCapabilities}} objects and how they get their snapshot.
+
+<hr>
+
+Every {{AISummarizerCapabilities}} has an <dfn for="AISummarizerCapabilities">available create options</dfn>, a [=map=] from [=tuples=] of ({{AISummarizerType}}, {{AISummarizerFormat}}, {{AISummarizerLength}}) values to {{AICapabilityAvailability}} values, set during creation. The [=map/values=] will never be "{{AICapabilityAvailability/no}}".
+
+Every {{AISummarizerCapabilities}} has an <dfn for="AISummarizerCapabilities">available languages</dfn>, a [=map=] of strings representing BCP 47 language tags to {{AICapabilityAvailability}} values, set during creation. The [=map/values=] will never be "{{AICapabilityAvailability/no}}".
+
+<div algorithm>
+  The <dfn attribute for="AISummarizerCapabilities">available</dfn> getter steps are:
+
+  1. If either [=this=]'s [=AISummarizerCapabilities/available create options=] or [=this=]'s [=AISummarizerCapabilities/available languages=] [=map/is empty|are empty=], then return "{{AICapabilityAvailability/no}}".
+
+  1. If all of [=this=]'s [=AISummarizerCapabilities/available create options=]'s [=map/values=] or all of [=this=]'s [=AISummarizerCapabilities/available languages=]'s [=map/values=] are "{{AICapabilityAvailability/after-download}}", then return "{{AICapabilityAvailability/after-download}}".
+
+  1. Return "{{AICapabilityAvailability/readily}}".
+</div>
+
+<div algorithm>
+  The <dfn method for="AISummarizerCapabilities">createOptionsAvailable(|options|)</dfn> method steps are:
+
+  1. Return [=this=]'s [=AISummarizerCapabilities/available create options=][(|options|["{{AISummarizerCreateCoreOptions/type}}"], |options|["{{AISummarizerCreateCoreOptions/format}}"], |options|["{{AISummarizerCreateCoreOptions/length}}"])].
+</div>
+
+<div algorithm>
+  The <dfn method for="AISummarizerCapabilities">languageAvailable(|languageTag|)</dfn> method steps are:
+
+  1. Return [=this=]'s [=AISummarizerCapabilities/available languages=][|languageTag|].
+
+  <p class="issue">Per <a href="https://github.com/WICG/translation-api/issues/11">WICG/translation-api#11</a> it seems we're supposed to do something more complex than just straight string comparison here, but it's not clear what.</p>
+</div>
+
+<hr>
+
+<div algorithm>
+  The <dfn>current summarizer capability value</dfn>, given a {{AISummarizerType}} |type|, {{AISummarizerFormat}} |format|, and an {{AISummarizerLength}} |length|, is the return value of the following steps:
+
+  1. [=Assert=]: this algorithm is running [=in parallel=].
+
+  1. If the user agent supports summarizing text into the type of summary described by |type|, in the format described by |format|, and with the length guidance given by |length| without performing any downloading operations, then return "{{AICapabilityAvailability/readily}}".
+
+  1. If the user agent believes it can summarize text according to |type|, |format|, and |length|, but only after performing a download (e.g., of an AI model or fine-tuning), then return "{{AICapabilityAvailability/after-download}}".
+
+  1. Otherwise, return "{{AICapabilityAvailability/no}}".
+</div>
+
+<h3 id="summarizer-object">Summarization</h3>
+
+Every {{AISummarizer}} has a <dfn for="AISummarizer">shared context</dfn>, a [=string=], set during creation.
+
+Every {{AISummarizer}} has a <dfn for="AISummarizer">summary type</dfn>, an {{AISummarizerType}}, set during creation.
+
+Every {{AISummarizer}} has a <dfn for="AISummarizer">summary format</dfn>, an {{AISummarizerFormat}}, set during creation.
+
+Every {{AISummarizer}} has a <dfn for="AISummarizer">summary length</dfn>, an {{AISummarizerLength}}, set during creation.
+
+The <dfn attribute for="AISummarizer">sharedContext</dfn> getter steps are to return [=this=]'s [=AISummarizer/shared context=].
+
+The <dfn attribute for="AISummarizer">type</dfn> getter steps are to return [=this=]'s [=AISummarizer/summary type=].
+
+The <dfn attribute for="AISummarizer">format</dfn> getter steps are to return [=this=]'s [=AISummarizer/summary format=].
+
+The <dfn attribute for="AISummarizer">length</dfn> getter steps are to return [=this=]'s [=AISummarizer/summary length=].
+
+The <dfn method for="AISummarizer">destroy()</dfn> method steps are to [=AISummarizer/destroy=] [=this=] given a new "{{AbortError}}" {{DOMException}}.
+
+<div algorithm>
+  To <dfn for="AISummarizer">destroy</dfn> an {{AISummarizer}} |summarizer|, given a JavaScript value |exception|:
+
+  1. TODO use |summarizer| and |exception|.
+</div>
