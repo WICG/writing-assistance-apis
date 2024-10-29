@@ -14,8 +14,9 @@ Assume Explicit For: yes
 Default Biblio Status: current
 Boilerplate: omit conformance
 Indent: 2
-Die On: warning
 </pre>
+
+TODO add back Die On: warning
 
 <pre class="link-defaults">
 spec:infra; type:dfn; text:user agent
@@ -183,11 +184,17 @@ The <dfn attribute for="AI">summarizer</dfn> getter steps are to return [=this=]
 
   1. [=In parallel=]:
 
-    1. Let |availability| be the [=current summarizer capability value=] given |options|["{{AISummarizerCreateCoreOptions/type}}"], |options|["{{AISummarizerCreateCoreOptions/format}}"], and |options|["{{AISummarizerCreateCoreOptions/length}}"].
+    1. Let |availability| be the [=current summarizer create options availability=] given |options|["{{AISummarizerCreateCoreOptions/type}}"], |options|["{{AISummarizerCreateCoreOptions/format}}"], and |options|["{{AISummarizerCreateCoreOptions/length}}"].
 
     1. Switch on |availability|:
 
     <dl class="switch">
+      : null
+      ::
+        1. [=Reject=] |promise| with an "{{UnknownError}}" {{DOMException}}.
+
+        1. Abort these steps.
+
       : "{{AICapabilityAvailability/no}}"
       ::
         1. [=Reject=] |promise| with a "{{NotSupportedError}}" {{DOMException}}.
@@ -282,7 +289,7 @@ The <dfn attribute for="AI">summarizer</dfn> getter steps are to return [=this=]
 
   1. [=Assert=]: these steps are running [=in parallel=].
 
-  1. [=Assert=]: the [=current summarizer capability value=] for |options|["{{AISummarizerCreateCoreOptions/type}}"], |options|["{{AISummarizerCreateCoreOptions/format}}"], and |options|["{{AISummarizerCreateCoreOptions/length}}"] is "{{AICapabilityAvailability/readily}}".
+  1. [=Assert=]: the [=current summarizer create options availability=] for |options|["{{AISummarizerCreateCoreOptions/type}}"], |options|["{{AISummarizerCreateCoreOptions/format}}"], and |options|["{{AISummarizerCreateCoreOptions/length}}"] is "{{AICapabilityAvailability/readily}}".
 
   1. [=Queue a global task=] on the [=AI task source=] given |promise|'s [=relevant global object=] to perform the following steps:
 
@@ -319,18 +326,57 @@ The <dfn attribute for="AI">summarizer</dfn> getter steps are to return [=this=]
 
 <h3 id="summarizer-capabilities">Capabilities</h3>
 
-TODO algorithm for the creation of {{AISummarizerCapabilities}} objects and how they get their snapshot.
+<div algorithm>
+  The <dfn method for="AISummarizerFactory">capabilities()</dfn> method steps are:
+
+  1. If [=this=]'s [=relevant global object=] is a {{Window}} whose [=associated Document=] is not [=Document/fully active=], then return [=a promise rejected with=] an "{{InvalidStateError}}" {{DOMException}}.
+
+  1. Let |promise| be [=a new promise=] created in [=this=]'s [=relevant realm=].
+
+  1. [=In parallel=]:
+
+    1. Let |availableCreateOptions| be a new [=map=] from [=tuples=] of ({{AISummarizerType}}, {{AISummarizerFormat}}, {{AISummarizerLength}}) values to {{AICapabilityAvailability}} values, initially empty.
+
+    1. [=list/For each=] |type| of {{AISummarizerType}}'s [=enumeration values=]:
+
+      1. [=list/For each=] |format| of {{AISummarizerFormat}}'s [=enumeration values=]:
+
+        1. [=list/For each=] |length| of {{AISummarizerLength}}'s [=enumeration values=]:
+
+          1. Set |availableCreateOptions|[(|type|, |format|, |length|)] to the [=current summarizer create options availability=] given |type|, |format|, and |length|.
+
+    1. Let |availableLanguages| be the [=current summarizer language availability map=].
+
+    1. If |availableLanguages| is null, or |availableCreateOptions|'s [=map/values=] [=list/contains=] null, then [=queue a global task=] on the [=AI task source=] given [=this=] to perform the following steps:
+
+      1. [=Reject=] |promise| with an "{{UnknownError}}" {{DOMException}}.
+
+    1. Otherwise, [=queue a global task=] on the [=AI task source=] given [=this=] to perform the following steps:
+
+      1. Let |capabilitiesObject| be a new {{AISummarizerCapabilities}} object, created in [=this=]'s [=relevant realm=], with
+
+        <dl class="props">
+          : [=AISummarizerCapabilities/available create options=]
+          :: |availableCreateOptions|
+          : [=AISummarizerCapabilities/available languages=]
+          :: |availableLanguages|
+        </dl>
+
+      1. [=Resolve=] |promise| with |capabilitiesObject|.
+</div>
 
 <hr>
 
-Every {{AISummarizerCapabilities}} has an <dfn for="AISummarizerCapabilities">available create options</dfn>, a [=map=] from [=tuples=] of ({{AISummarizerType}}, {{AISummarizerFormat}}, {{AISummarizerLength}}) values to {{AICapabilityAvailability}} values, set during creation. The [=map/values=] will never be "{{AICapabilityAvailability/no}}".
+Every {{AISummarizerCapabilities}} has an <dfn for="AISummarizerCapabilities">available create options</dfn>, a [=map=] from [=tuples=] of ({{AISummarizerType}}, {{AISummarizerFormat}}, {{AISummarizerLength}}) values to {{AICapabilityAvailability}} values, set during creation.
 
 Every {{AISummarizerCapabilities}} has an <dfn for="AISummarizerCapabilities">available languages</dfn>, a [=map=] of strings representing BCP 47 language tags to {{AICapabilityAvailability}} values, set during creation. The [=map/values=] will never be "{{AICapabilityAvailability/no}}".
 
 <div algorithm>
   The <dfn attribute for="AISummarizerCapabilities">available</dfn> getter steps are:
 
-  1. If either [=this=]'s [=AISummarizerCapabilities/available create options=] or [=this=]'s [=AISummarizerCapabilities/available languages=] [=map/is empty|are empty=], then return "{{AICapabilityAvailability/no}}".
+  1. If [=this=]'s [=AISummarizerCapabilities/available languages=] [=map/is empty|are empty=], then return "{{AICapabilityAvailability/no}}".
+
+  1. If [=this=]'s all of [=this=]'s [=AISummarizerCapabilities/available create options=] [=map/values=] are "{{AICapabilityAvailability/no}}", then return "{{AICapabilityAvailability/no}}".
 
   1. If all of [=this=]'s [=AISummarizerCapabilities/available create options=]'s [=map/values=] or all of [=this=]'s [=AISummarizerCapabilities/available languages=]'s [=map/values=] are "{{AICapabilityAvailability/after-download}}", then return "{{AICapabilityAvailability/after-download}}".
 
@@ -346,15 +392,15 @@ Every {{AISummarizerCapabilities}} has an <dfn for="AISummarizerCapabilities">av
 <div algorithm>
   The <dfn method for="AISummarizerCapabilities">languageAvailable(|languageTag|)</dfn> method steps are:
 
-  1. Return [=this=]'s [=AISummarizerCapabilities/available languages=][|languageTag|].
+  1. Return [=this=]'s [=AISummarizerCapabilities/available languages=][|languageTag|], or "{{AICapabilityAvailability/no}}" if no such [=map/entry=] [=map/exists=].
 
-  <p class="issue">Per <a href="https://github.com/WICG/translation-api/issues/11">WICG/translation-api#11</a> it seems we're supposed to do something more complex than just straight string comparison here, but it's not clear what.</p>
+  <p class="issue">Per <a href="https://github.com/WICG/translation-api/issues/11">WICG/translation-api#11</a> it seems we're supposed to do something more complex than just straight string comparison for language tags, but it's not clear what.</p>
 </div>
 
 <hr>
 
 <div algorithm>
-  The <dfn>current summarizer capability value</dfn>, given a {{AISummarizerType}} |type|, {{AISummarizerFormat}} |format|, and an {{AISummarizerLength}} |length|, is the return value of the following steps:
+  The <dfn>current summarizer create options availability</dfn>, given a {{AISummarizerType}} |type|, {{AISummarizerFormat}} |format|, and an {{AISummarizerLength}} |length|, is given by the following steps. They return an {{AICapabilityAvailability}} value or null.
 
   1. [=Assert=]: this algorithm is running [=in parallel=].
 
@@ -362,7 +408,33 @@ Every {{AISummarizerCapabilities}} has an <dfn for="AISummarizerCapabilities">av
 
   1. If the user agent believes it can summarize text according to |type|, |format|, and |length|, but only after performing a download (e.g., of an AI model or fine-tuning), then return "{{AICapabilityAvailability/after-download}}".
 
+  1. If there is some error attempting to determine whether the user agent supports summarizing text, which the user agent believes to be transient (such that re-querying the [=current summarizer create options availability=] could stop producing such an error), then return null.
+
   1. Otherwise, return "{{AICapabilityAvailability/no}}".
+</div>
+
+<div algorithm>
+  The <dfn>current summarizer language availability map</dfn> is given by the following steps. They return a [=map=] from strings representing BCP 47 language tags to {{AICapabilityAvailability}} values, or null. [[!RFC5646]]
+
+  1. [=Assert=]: this algorithm is running [=in parallel=].
+
+  1. If there is some error attempting to determine whether the user agent supports summarizing text, which the user agent believes to be transient (such that re-querying the [=current summarizer create options availability=] could stop producing such an error), then return null.
+
+  1. Let |availableLanguages| be an empty [=map=].
+
+  1. [=list/For each=] human language for which the user agent supports summarizing text written in that language, without performing any downloading operations:
+
+    1. Let |languageTag| be that language, represented as a BCP 47 language tag string. <span class="issue">Describe how to handle subtags.</span>
+
+    1. Set |availableLanguages|[|languageTag|] to "{{AICapabilityAvailability/readily}}".
+
+  1. [=list/For each=] human language for which the user agent believes it can summarize text written in that language, but only after performing a download (e.g., of an AI model or fine-tuning):
+
+    1. Let |languageTag| be that language, represented as a BCP 47 language tag string. <span class="issue">Describe how to handle subtags.</span>
+
+    1. Set |availableLanguages|[|languageTag|] to "{{AICapabilityAvailability/after-download}}".
+
+  1. Return |availableLanguages|.
 </div>
 
 <h3 id="summarizer-object">Summarization</h3>
