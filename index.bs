@@ -90,8 +90,14 @@ interface AISummarizerFactory {
 
 [Exposed=(Window,Worker), SecureContext]
 interface AISummarizer {
-  Promise<DOMString> summarize(DOMString input, optional AISummarizerSummarizeOptions options = {});
-  ReadableStream summarizeStreaming(DOMString input, optional AISummarizerSummarizeOptions options = {});
+  Promise<DOMString> summarize(
+    DOMString input,
+    optional AISummarizerSummarizeOptions options = {}
+  );
+  ReadableStream summarizeStreaming(
+    DOMString input,
+    optional AISummarizerSummarizeOptions options = {}
+  );
 
   readonly attribute DOMString sharedContext;
   readonly attribute AISummarizerType type;
@@ -105,7 +111,9 @@ interface AISummarizer {
 interface AISummarizerCapabilities {
   readonly attribute AICapabilityAvailability available;
 
-  AICapabilityAvailability createOptionsAvailable(optional AISummarizerCreateCoreOptions options = {});
+  AICapabilityAvailability createOptionsAvailable(
+    optional AISummarizerCreateCoreOptions options = {}
+  );
   AICapabilityAvailability languageAvailable(DOMString languageTag);
 };
 
@@ -256,7 +264,7 @@ The <dfn attribute for="AI">summarizer</dfn> getter steps are to return [=this=]
 
   1. [=Assert=]: these steps are running [=in parallel=].
 
-  1. Perform any necessarily initialization operations for the AI model backing the [=user agent=]'s summarization capabilities.
+  1. Perform any necessary initialization operations for the AI model backing the [=user agent=]'s summarization capabilities.
 
     This could include loading the model into memory, loading |options|["{{AISummarizerCreateOptions/sharedContext}}"] into the model's context window, or loading any fine-tunings necessary to support |options|["{{AISummarizerCreateCoreOptions/type}}"], |options|["{{AISummarizerCreateCoreOptions/format}}"], or |options|["{{AISummarizerCreateCoreOptions/length}}"].
 
