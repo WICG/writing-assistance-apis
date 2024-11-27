@@ -36,6 +36,8 @@ dl.props { display: grid; grid-template-columns: max-content auto; row-gap: 0.25
 dl.props > dt { grid-column-start: 1; margin: 0; }
 dl.props > dd { grid-column-start: 2; margin: 0; }
 p + dl.props { margin-top: -0.5em; }
+
+.enum-table tbody th { white-space: nowrap; }
 </style>
 
 <h2 id="intro">Introduction</h2>
@@ -145,7 +147,7 @@ dictionary AISummarizerSummarizeOptions {
   DOMString context;
 };
 
-enum AISummarizerType { "tl;dr", "key-points", "teaser", "headline" };
+enum AISummarizerType { "tl;dr", "teaser", "key-points", "headline" };
 enum AISummarizerFormat { "plain-text", "markdown" };
 enum AISummarizerLength { "short", "medium", "long" };
 </xmp>
@@ -228,7 +230,7 @@ The <dfn attribute for="AI">summarizer</dfn> getter steps are to return [=this=]
       ::
         1. Initiate the download process for everything the user agent needs to summarize text according to |options|["{{AISummarizerCreateCoreOptions/type}}"], |options|["{{AISummarizerCreateCoreOptions/format}}"], or |options|["{{AISummarizerCreateCoreOptions/length}}"].
 
-        1. Run the following steps, by [=abort when=] |abortedDuringDownload| becomes true:
+        1. Run the following steps, but [=abort when=] |abortedDuringDownload| becomes true:
 
           1. Wait for the total number of bytes to be downloaded to become determined, and let that number be |totalBytes|.
 
@@ -314,7 +316,7 @@ The <dfn attribute for="AI">summarizer</dfn> getter steps are to return [=this=]
 
       <dl class="props">
         : [=AISummarizer/shared context=]
-        :: |options|["{{AISummarizerCreateOptions/sharedContext}}"]
+        :: |options|["{{AISummarizerCreateOptions/sharedContext}}"] if it [=map/exists=]; otherwise null
 
         : [=AISummarizer/summary type=]
         :: |options|["{{AISummarizerCreateCoreOptions/type}}"]
@@ -380,9 +382,9 @@ The <dfn attribute for="AI">summarizer</dfn> getter steps are to return [=this=]
 
 Every {{AISummarizerCapabilities}} has an <dfn for="AISummarizerCapabilities">available create options</dfn>, a [=map=] from [=tuples=] of ({{AISummarizerType}}, {{AISummarizerFormat}}, {{AISummarizerLength}}) values to {{AICapabilityAvailability}} values, set during creation.
 
-Every {{AISummarizerCapabilities}} has an <dfn for="AISummarizerCapabilities">readily available languages</dfn>, [=set=] of strings representing BCP 47 language tags, set during creation.
+Every {{AISummarizerCapabilities}} has an <dfn for="AISummarizerCapabilities">readily available languages</dfn>, a [=set=] of strings representing BCP 47 language tags, set during creation.
 
-Every {{AISummarizerCapabilities}} has an <dfn for="AISummarizerCapabilities">after-download available languages</dfn>, [=set=] of strings representing BCP 47 language tags, set during creation.
+Every {{AISummarizerCapabilities}} has an <dfn for="AISummarizerCapabilities">after-download available languages</dfn>, a [=set=] of strings representing BCP 47 language tags, set during creation.
 
 <div algorithm>
   The <dfn attribute for="AISummarizerCapabilities">available</dfn> getter steps are:
@@ -441,7 +443,7 @@ Every {{AISummarizerCapabilities}} has an <dfn for="AISummarizerCapabilities">af
 </div>
 
 <div algorithm>
-  The <dfn>current summarizer language availabilities</dfn> are given by the following steps. They return a [=list=] containing two [=list/items=]; the items each are [=sets=] of strings representing [=Unicode canonicalized locale identifier=], or null. [[!ECMA-402]]
+  The <dfn>current summarizer language availabilities</dfn> are given by the following steps. They return a [=list=] containing two [=list/items=]; the items each are [=sets=] of strings representing [=Unicode canonicalized locale identifiers=], or null. [[!ECMA-402]]
 
   1. [=Assert=]: this algorithm is running [=in parallel=].
 
@@ -503,15 +505,23 @@ Every {{AISummarizerCapabilities}} has an <dfn for="AISummarizerCapabilities">af
   </div>
 </div>
 
-<h3 id="summarizer-object">Summarization</h3>
+<h3 id="the-aisummarizer-class">The {{AISummarizer}} class</h3>
 
-Every {{AISummarizer}} has a <dfn for="AISummarizer">shared context</dfn>, a [=string=], set during creation.
+Every {{AISummarizer}} has a <dfn for="AISummarizer">shared context</dfn>, a [=string=]-or-null, set during creation.
 
 Every {{AISummarizer}} has a <dfn for="AISummarizer">summary type</dfn>, an {{AISummarizerType}}, set during creation.
 
 Every {{AISummarizer}} has a <dfn for="AISummarizer">summary format</dfn>, an {{AISummarizerFormat}}, set during creation.
 
 Every {{AISummarizer}} has a <dfn for="AISummarizer">summary length</dfn>, an {{AISummarizerLength}}, set during creation.
+
+Every {{AISummarizer}} has a <dfn for="AISummarizer">destruction reason</dfn>, a JavaScript value, initially undefined.
+
+Every {{AISummarizer}} has a <dfn for="AISummarizer">destroyed</dfn> boolean, initially false.
+
+<p class="note">This value is separate from the [=AISummarizer/destruction reason=] so that it can be read from [=in parallel=] during the summarization process.
+
+<hr>
 
 The <dfn attribute for="AISummarizer">sharedContext</dfn> getter steps are to return [=this=]'s [=AISummarizer/shared context=].
 
@@ -521,10 +531,387 @@ The <dfn attribute for="AISummarizer">format</dfn> getter steps are to return [=
 
 The <dfn attribute for="AISummarizer">length</dfn> getter steps are to return [=this=]'s [=AISummarizer/summary length=].
 
-The <dfn method for="AISummarizer">destroy()</dfn> method steps are to [=AISummarizer/destroy=] [=this=] given a new "{{AbortError}}" {{DOMException}}.
+<hr>
 
 <div algorithm>
-  To <dfn for="AISummarizer">destroy</dfn> an {{AISummarizer}} |summarizer|, given a JavaScript value |exception|:
+  The <dfn method for="AISummarizer">summarize(|input|, |options|)</dfn> method steps are:
 
-  1. TODO use |summarizer| and |exception|.
+  1. If [=this=]'s [=relevant global object=] is a {{Window}} whose [=associated Document=] is not [=Document/fully active=], then return [=a promise rejected with=] an "{{InvalidStateError}}" {{DOMException}}.
+
+  1. If [=this=]'s [=AISummarizer/destroyed=] is true, then return [=a promise rejected with=] [=this=]'s [=AISummarizer/destruction reason=].
+
+  1. If |options|["{{AISummarizerSummarizeOptions/signal}}"] [=map/exists=] and is [=AbortSignal/aborted=], then return [=a promise rejected with=] |options|["{{AISummarizerSummarizeOptions/signal}}"]'s [=AbortSignal/abort reason=].
+
+  1. Let |abortedDuringSummarization| be false.
+
+    <p class="note">This variable will be written to from the [=event loop=], but read from [=in parallel=].
+
+  1. If |options|["{{AISummarizerSummarizeOptions/signal}}"] [=map/exists=], then [=AbortSignal/add|add the following abort steps=] to |options|["{{AISummarizerSummarizeOptions/signal}}"]:
+
+    1. Set |abortedDuringSummarization| to true.
+
+  1. Let |promise| be [=a new promise=] created in [=this=]'s [=relevant realm=].
+
+  1. Let |context| be |options|["{{AISummarizerSummarizeOptions/context}}"] if it [=map/exists=]; otherwise null.
+
+  1. [=In parallel=]:
+
+    1. Let |summary| be the empty string.
+
+    1. Let |chunkProduced| be the following steps given a [=string=] |chunk|:
+
+      1. [=Queue a global task=] on the [=AI task source=] given [=this=]'s [=relevant global object=] to perform the following steps:
+
+        1. If |abortedDuringSummarization| is true, then:
+
+          1. [=Reject=] |promise| with |options|["{{AISummarizerSummarizeOptions/signal}}"]'s [=AbortSignal/abort reason=].
+
+          1. Abort these steps.
+
+        1. If [=this=]'s [=AISummarizer/destroyed=] is true, then:
+
+          1. [=Reject=] |promise| with [=this=]'s [=AISummarizer/destruction reason=].
+
+          1. Abort these steps.
+
+        1. Append |chunk| to |summary|.
+
+    1. Let |done| be the following steps:
+
+      1. [=Queue a global task=] on the [=AI task source=] given [=this=]'s [=relevant global object=] to perform the following steps:
+
+        1. If |abortedDuringSummarization| is true, then:
+
+          1. [=Reject=] |promise| with |options|["{{AISummarizerSummarizeOptions/signal}}"]'s [=AbortSignal/abort reason=].
+
+          1. Abort these steps.
+
+        1. If [=this=]'s [=AISummarizer/destroyed=] is true, then:
+
+          1. [=Reject=] |promise| with [=this=]'s [=AISummarizer/destruction reason=].
+
+          1. Abort these steps.
+
+        1. [=Resolve=] |promise| with |summary|.
+
+    1. Let |error| be the following steps given [=summarization error information=] |errorInfo|:
+
+      1. [=Queue a global task=] on the [=AI task source=] given [=this=]'s [=relevant global object=] to perform the following steps:
+
+        1. If |abortedDuringSummarization| is true, then:
+
+          1. [=Reject=] |promise| with |options|["{{AISummarizerSummarizeOptions/signal}}"]'s [=AbortSignal/abort reason=].
+
+          1. Abort these steps.
+
+        1. Let |exception| be the result of [=exception/creating=] a {{DOMException}} with name given by |errorInfo|'s [=summarization error information/error name=], using |errorInfo|'s [=summarization error information/error information=] to populate the message appropriately.
+
+        1. [=Reject=] |promise| with |exception|.
+
+    1. Let |stopProducing| be the following steps:
+
+      1. Return |abortedDuringSummarization|.
+
+    1. [=Summarize=] |input| given [=this=]'s [=AISummarizer/shared context=], |context|, [=this=]'s [=AISummarizer/summary type=], [=this=]'s [=AISummarizer/summary format=], [=this=]'s [=AISummarizer/summary length=], |chunkProduced|, |done|, |error|, and |stopProducing|.
+
+  1. Return |promise|.
 </div>
+
+<div algorithm>
+  The <dfn method for="AISummarizer">summarizeStreaming(|input|, |options|)</dfn> method steps are:
+
+  1. If [=this=]'s [=relevant global object=] is a {{Window}} whose [=associated Document=] is not [=Document/fully active=], then return [=a promise rejected with=] an "{{InvalidStateError}}" {{DOMException}}.
+
+  1. If [=this=]'s [=AISummarizer/destroyed=] is true, then return [=a promise rejected with=] [=this=]'s [=AISummarizer/destruction reason=].
+
+  1. If |options|["{{AISummarizerSummarizeOptions/signal}}"] [=map/exists=] and is [=AbortSignal/aborted=], then return [=a promise rejected with=] |options|["{{AISummarizerSummarizeOptions/signal}}"]'s [=AbortSignal/abort reason=].
+
+  1. Let |abortedDuringSummarization| be false.
+
+    <p class="note">This variable tracks web developer aborts via the |options|["{{AISummarizerSummarizeOptions/signal}}"] {{AbortSignal}}, which are surfaced as errors. It will be written to from the [=event loop=], but sometimes read from [=in parallel=].
+
+  1. If |options|["{{AISummarizerSummarizeOptions/signal}}"] [=map/exists=], then [=AbortSignal/add|add the following abort steps=] to |options|["{{AISummarizerSummarizeOptions/signal}}"]:
+
+    1. Set |abortedDuringSummarization| to true.
+
+  1. Let |stream| be a [=new=] {{ReadableStream}} created in [=this=]'s [=relevant realm=].
+
+  1. Let |canceledDuringSummarization| be false.
+
+    <p class="note">This variable tracks web developer [=ReadableStream/cancel|stream cancelations=] via {{ReadableStream/cancel()|stream.cancel()}}, which are not surfaced as errors.  It will be written to from the [=event loop=], but sometimes read from [=in parallel=].
+
+  1. [=ReadableStream/Set up=] |stream| with <i>[=ReadableStream/set up/cancelAlgorithm=]</i> set to the following steps (ignoring the <var ignore>reason</var> argument):
+
+    1. Set |canceledDuringSummarization| to true.
+
+  1. Let |context| be |options|["{{AISummarizerSummarizeOptions/context}}"] if it [=map/exists=]; otherwise null.
+
+  1. [=In parallel=]:
+
+    1. Let |chunkProduced| be the following steps given a [=string=] |chunk|:
+
+      1. [=Queue a global task=] on the [=AI task source=] given [=this=]'s [=relevant global object=] to perform the following steps:
+
+        1. If |abortedDuringSummarization| is true, then:
+
+          1. [=ReadableStream/Error=] |stream| with |options|["{{AISummarizerSummarizeOptions/signal}}"]'s [=AbortSignal/abort reason=].
+
+          1. Abort these steps.
+
+        1. If [=this=]'s [=AISummarizer/destroyed=] is true, then:
+
+          1. [=ReadableStream/Error=] |stream| with [=this=]'s [=AISummarizer/destruction reason=].
+
+          1. Abort these steps.
+
+        1. [=ReadableStream/Enqueue=] |chunk| into |stream|.
+
+    1. Let |done| be the following steps:
+
+      1. [=Queue a global task=] on the [=AI task source=] given [=this=]'s [=relevant global object=] to perform the following steps:
+
+        1. If |abortedDuringSummarization| is true, then:
+
+          1. [=ReadableStream/Error=] |stream| with |options|["{{AISummarizerSummarizeOptions/signal}}"]'s [=AbortSignal/abort reason=].
+
+          1. Abort these steps.
+
+        1. If [=this=]'s [=AISummarizer/destroyed=] is true, then:
+
+          1. [=ReadableStream/Error=] |stream| with [=this=]'s [=AISummarizer/destruction reason=].
+
+          1. Abort these steps.
+
+        1. [=ReadableStream/Close=] |stream|.
+
+    1. Let |error| be the following steps given [=summarization error information=] |errorInfo|:
+
+      1. [=Queue a global task=] on the [=AI task source=] given [=this=]'s [=relevant global object=] to perform the following steps:
+
+        1. If |abortedDuringSummarization| is true, then:
+
+          1. [=ReadableStream/Error=] |stream| with |options|["{{AISummarizerSummarizeOptions/signal}}"]'s [=AbortSignal/abort reason=].
+
+          1. Abort these steps.
+
+        1. If [=this=]'s [=AISummarizer/destroyed=] is true, then:
+
+          1. [=ReadableStream/Error=] |stream| with [=this=]'s [=AISummarizer/destruction reason=].
+
+          1. Abort these steps.
+
+        1. Let |exception| be the result of [=exception/creating=] a {{DOMException}} with name given by |errorInfo|'s [=summarization error information/error name=], using |errorInfo|'s [=summarization error information/error information=] to populate the message appropriately.
+
+        1. [=ReadableStream/Error=] |stream| with |exception|.
+
+    1. Let |stopProducing| be the following steps:
+
+      1. If any of |abortedDuringSummarization|, |canceledDuringSummarization|, or [=this=]'s [=AISummarizer/destroyed=] are true, then return true.
+
+      1. Return false.
+
+    1. [=Summarize=] |input| given [=this=]'s [=AISummarizer/shared context=], |context|, [=this=]'s [=AISummarizer/summary type=], [=this=]'s [=AISummarizer/summary format=], [=this=]'s [=AISummarizer/summary length=], |chunkProduced|, |done|, |error|, and |stopProducing|.
+
+  1. Return |stream|.
+</div>
+
+<div algorithm>
+  To <dfn>summarize</dfn> a string |input|, given a string-or-null |sharedContext|, a string-or-null |context|, an {{AISummarizerType}} |type|, an {{AISummarizerFormat}} |format|, an {{AISummarizerLength}} |length|, an algorithm |chunkProduced| that takes a string and returns nothing, an algorithm |done| that takes no arguments and returns nothing, an algorithm |error| that takes [=summarization error information=] and returns nothing, and an algorithm |stopProducing| that takes no arguments and returns a boolean:
+
+  1. [=Assert=]: this algorithm is running [=in parallel=].
+
+  1. [=Assert=]: the [=current summarizer create options availability=] given |type|, |format|, and |length| is "{{AICapabilityAvailability/readily}}".
+
+     <p class="note">Otherwise, the {{AISummarizer}} object would not have been created.
+
+  1. In an [=implementation-defined=] manner, subject to the following guidelines, begin the processs of summarizing |input| into a string.
+
+     If they are non-null, |sharedContext| and |context| should be used to aid in the summarization by providing context on how the web developer wishes the input to be summarized.
+
+     The summarization should conform to the guidance given by |type|, |format|, and |length|, in the definitions of each of their enumeration values.
+
+  1. While true:
+
+    1. Wait for the next chunk of summarization data to be produced, for the summarization process to finish, or for the result of calling |stopProducing| to become true.
+
+    1. If such a chunk is successfully produced:
+
+      1. Let it be represented as a [=string=] |chunk|.
+
+      1. Perform |chunkProduced| given |chunk|.
+
+    1. Otherwise, if the summarization process has finished:
+
+      1. Perform |done|.
+
+      1. [=iteration/Break=].
+
+    1. Otherwise, if |stopProducing| returns true, then [=iteration/break=].
+
+       <p class="note">The caller will handle signaling cancelation or aborting as necessary.
+
+    1. Otherwise, if an error occurred during summarization:
+
+      1. Let the error be represented as [=summarization error information=] |errorInfo| according to the guidance in [[#summarizer-errors]].
+
+      1. Perform |error| given |errorInfo|.
+
+      1. [=iteration/Break=].
+</div>
+
+<hr>
+
+<div algorithm>
+  <p>The <dfn method for="AISummarizer">destroy()</dfn> method steps are to [=AISummarizer/destroy=] [=this=] given a new "{{AbortError}}" {{DOMException}}.
+</div>
+
+<div algorithm>
+  To <dfn for="AISummarizer">destroy</dfn> an {{AISummarizer}} |summarizer|, given a JavaScript value |reason|:
+
+  1. Set |summarizer|'s [=AISummarizer/destroyed=] to true.
+
+  1. Set |summarizer|'s [=AISummarizer/destruction reason=] to |reason|.
+
+  1. The user agent should release any resources associated with |summarizer|, such as AI models loaded during [=initialize the summarization model=], as long as those resources are not needed for other ongoing operations.
+</div>
+
+<h3 id="summarizer-options">Options</h3>
+
+The [=summarize=] algorithm's details are [=implementation-defined=], as they are expected to be powered by an AI model. However, it is intended to be controllable by the web developer through the {{AISummarizerType}}, {{AISummarizerFormat}}, and {{AISummarizerLength}} enumerations.
+
+This section gives normative guidance on how the implementation of [=summarize=] should use each enumeration value to guide the summarization process.
+
+<table class="data enum-table">
+  <caption>{{AISummarizerType}} values</caption>
+  <thead>
+    <tr>
+      <th>Value
+      <th>Meaning
+  <tbody>
+    <tr>
+      <th>"<dfn enum-value for="AISummarizerType">tl;dr</dfn>"
+      <td>
+        <p>The summary should be short and to the point, providing a quick overview of the input, suitable for a busy reader.
+    <tr>
+      <th>"<dfn enum-value for="AISummarizerType">teaser</dfn>"
+      <td>
+        <p>The summary should focus on the most interesting or intriguing parts of the input, designed to draw the the reader in to read more.
+    <tr>
+      <th>"<dfn enum-value for="AISummarizerType">key-points</dfn>"
+      <td>
+        <p>The summary should extract the most important points from the input, presented as a bulleted list.
+    <tr>
+      <th>"<dfn enum-value for="AISummarizerType">headline</dfn>"
+      <td>
+        <p>The summary should effectively containing the main point of the input in a single sentence, in the format of an article headline.
+</table>
+
+<table class="data enum-table">
+  <caption>{{AISummarizerLength}} values</caption>
+  <thead>
+    <tr>
+      <th>Value
+      <th>Meaning
+  <tbody>
+    <tr>
+      <th>"<dfn enum-value for="AISummarizerLength">short</dfn>"
+      <td>
+        <p>The guidance is dependent on the value of {{AISummarizerType}}:
+
+        <dl class="switch">
+          : "{{AISummarizerType/tl;dr}}"
+          : "{{AISummarizerType/teaser}}"
+          :: The summary should fit within a one sentence.
+          : "{{AISummarizerType/key-points}}"
+          :: The summary should consist of no more than 3 bullet points.
+          : "{{AISummarizerType/headline}}"
+          :: The summary should use no more than 12 words.
+        </dl>
+    <tr>
+      <th>"<dfn enum-value for="AISummarizerLength">medium</dfn>"
+      <td>
+        <p>The guidance is dependent on the value of {{AISummarizerType}}:
+
+        <dl class="switch">
+          : "{{AISummarizerType/tl;dr}}"
+          : "{{AISummarizerType/teaser}}"
+          :: The summary should fit within a one short paragraph.
+          : "{{AISummarizerType/key-points}}"
+          :: The summary should consist of no more than 5 bullet points.
+          : "{{AISummarizerType/headline}}"
+          :: The summary should use no more than 17 words.
+        </dl>
+    <tr>
+      <th>"<dfn enum-value for="AISummarizerLength">long</dfn>"
+      <td>
+        <p>The guidance is dependent on the value of {{AISummarizerType}}:
+
+        <dl class="switch">
+          : "{{AISummarizerType/tl;dr}}"
+          : "{{AISummarizerType/teaser}}"
+          :: The summary should fit within a one paragraph.
+          : "{{AISummarizerType/key-points}}"
+          :: The summary should consist of no more than 7 bullet points.
+          : "{{AISummarizerType/headline}}"
+          :: The summary should use no more than 22 words.
+        </dl>
+</table>
+
+<table class="data enum-table">
+  <caption>{{AISummarizerFormat}} values</caption>
+  <thead>
+    <tr>
+      <th>Value
+      <th>Meaning
+  <tbody>
+    <tr>
+      <th>"<dfn enum-value for="AISummarizerFormat">plain-text</dfn>"
+      <td>
+        <p>The summary should not contain any formatting or markup language.
+    <tr>
+      <th>"<dfn enum-value for="AISummarizerFormat">markdown</dfn>"
+      <td>
+        <p>The summary should be formatted using the Markdown markup language, ideally as valid CommonMark. [[!COMMONMARK]]
+</table>
+
+<h3 id="summarizer-errors">Errors</h3>
+
+A <dfn>summarization error information</dfn> is a [=struct=] with the following items:
+
+: <dfn for="summarization error information">error name</dfn>
+:: a [=string=] that will be used for the {{DOMException}}'s [=DOMException/name=].
+: <dfn for="summarization error information">error information</dfn>
+:: other information necessary to create a useful {{DOMException}} for the web developer. (Typically, just an exception message.)
+
+When summarization fails, the following possible reasons may be surfaced to the web developer. This table lists the possible {{DOMException}} [=DOMException/names=] and the cases in which an implementation should use them:
+
+<table class="data">
+  <thead>
+    <tr>
+      <th>{{DOMException}} [=DOMException/name=]
+      <th>Scenarios
+  <tbody>
+    <tr>
+      <td>"{{NotAllowedError}}"
+      <td>
+        <p>Summarization is disabled by user choice or user agent policy.
+    <tr>
+      <td>"{{NotReadableError}}"
+      <td>
+        <p>The summarization output was filtered by the user agent, e.g., because it was detected to be harmful, inaccurate, or nonsensical.
+    <tr>
+      <td>"{{NotSupportedError}}"
+      <td>
+        <p>The input to be summarized was in a language that the user agent does not support summarizing.
+        <p>The summarization output was detected to be in a language that the user agent does not have sufficient quality control for and is not willing to support.
+    <tr>
+      <td>"{{QuotaExceededError}}"
+      <td>
+        <p>The input to be summarized was too large for the user agent to handle.
+    <tr>
+      <td>"{{UnknownError}}"
+      <td>
+        <p>All other scenarios, or if the user agent would prefer not to disclose the failure reason.
+</table>
+
+<p class="note">This table does not give the complete list of exceptions that can be surfaced by {{AISummarizer/summarize()|summarizer.summarize()}} and {{AISummarizer/summarize()|summarizer.summarizeStreaming()}}. It only contains those which can come from the [=implementation-defined=] [=summarize=] algorithm.
