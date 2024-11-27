@@ -20,6 +20,16 @@ Die On: warning
 <pre class="link-defaults">
 spec:infra; type:dfn; text:user agent
 </pre>
+<pre class="anchors">
+urlPrefix: https://tc39.es/ecma402/; spec: ECMA-402
+  type: dfn
+    text: [[AvailableLocales]]; url: sec-internal-slots
+    text: Unicode canonicalized locale identifier; url: sec-language-tags
+  type: abstract-op
+    text: LookupMatchingLocaleByBestFit; url: sec-lookupmatchinglocalebybestfit
+    text: IsStructurallyValidLanguageTag; url: sec-isstructurallyvalidlanguagetag
+    text: CanonicalizeUnicodeLocaleId; url: sec-canonicalizeunicodelocaleid
+</pre>
 
 <style>
 dl.props { display: grid; grid-template-columns: max-content auto; row-gap: 0.25em; column-gap: 1em; }
@@ -344,9 +354,9 @@ The <dfn attribute for="AI">summarizer</dfn> getter steps are to return [=this=]
 
           1. Set |availableCreateOptions|[(|type|, |format|, |length|)] to the [=current summarizer create options availability=] given |type|, |format|, and |length|.
 
-    1. Let |availableLanguages| be the [=current summarizer language availability map=].
+    1. Let « |readilyAvailableLanguages|, |afterDownloadAvailableLanguages| » be the [=current summarizer language availabilities=].
 
-    1. If |availableLanguages| is null, or |availableCreateOptions|'s [=map/values=] [=list/contains=] null, then [=queue a global task=] on the [=AI task source=] given [=this=] to perform the following steps:
+    1. If |readilyAvailableLanguages| is null, |afterDownloadAvailableLanguages| is null, or |availableCreateOptions|'s [=map/values=] [=list/contains=] null, then [=queue a global task=] on the [=AI task source=] given [=this=] to perform the following steps:
 
       1. [=Reject=] |promise| with an "{{UnknownError}}" {{DOMException}}.
 
@@ -357,8 +367,10 @@ The <dfn attribute for="AI">summarizer</dfn> getter steps are to return [=this=]
         <dl class="props">
           : [=AISummarizerCapabilities/available create options=]
           :: |availableCreateOptions|
-          : [=AISummarizerCapabilities/available languages=]
-          :: |availableLanguages|
+          : [=AISummarizerCapabilities/readily available languages=]
+          :: |readilyAvailableLanguages|
+          : [=AISummarizerCapabilities/after-download available languages=]
+          :: |afterDownloadAvailableLanguages|
         </dl>
 
       1. [=Resolve=] |promise| with |capabilitiesObject|.
@@ -368,16 +380,18 @@ The <dfn attribute for="AI">summarizer</dfn> getter steps are to return [=this=]
 
 Every {{AISummarizerCapabilities}} has an <dfn for="AISummarizerCapabilities">available create options</dfn>, a [=map=] from [=tuples=] of ({{AISummarizerType}}, {{AISummarizerFormat}}, {{AISummarizerLength}}) values to {{AICapabilityAvailability}} values, set during creation.
 
-Every {{AISummarizerCapabilities}} has an <dfn for="AISummarizerCapabilities">available languages</dfn>, a [=map=] of strings representing BCP 47 language tags to {{AICapabilityAvailability}} values, set during creation. The [=map/values=] will never be "{{AICapabilityAvailability/no}}".
+Every {{AISummarizerCapabilities}} has an <dfn for="AISummarizerCapabilities">readily available languages</dfn>, [=set=] of strings representing BCP 47 language tags, set during creation.
+
+Every {{AISummarizerCapabilities}} has an <dfn for="AISummarizerCapabilities">after-download available languages</dfn>, [=set=] of strings representing BCP 47 language tags, set during creation.
 
 <div algorithm>
   The <dfn attribute for="AISummarizerCapabilities">available</dfn> getter steps are:
 
-  1. If [=this=]'s [=AISummarizerCapabilities/available languages=] [=map/is empty|are empty=], then return "{{AICapabilityAvailability/no}}".
+  1. If [=this=]'s [=AISummarizerCapabilities/readily available languages=] and [=AISummarizerCapabilities/after-download available languages=] [=map/is empty|are empty=], then return "{{AICapabilityAvailability/no}}".
 
   1. If [=this=]'s all of [=this=]'s [=AISummarizerCapabilities/available create options=] [=map/values=] are "{{AICapabilityAvailability/no}}", then return "{{AICapabilityAvailability/no}}".
 
-  1. If all of [=this=]'s [=AISummarizerCapabilities/available create options=]'s [=map/values=] or all of [=this=]'s [=AISummarizerCapabilities/available languages=]'s [=map/values=] are "{{AICapabilityAvailability/after-download}}", then return "{{AICapabilityAvailability/after-download}}".
+  1. If [=this=]'s [=AISummarizerCapabilities/readily available languages=] [=map/is empty|are empty=], then return "{{AICapabilityAvailability/after-download}}".
 
   1. Return "{{AICapabilityAvailability/readily}}".
 </div>
@@ -391,9 +405,23 @@ Every {{AISummarizerCapabilities}} has an <dfn for="AISummarizerCapabilities">av
 <div algorithm>
   The <dfn method for="AISummarizerCapabilities">languageAvailable(|languageTag|)</dfn> method steps are:
 
-  1. Return [=this=]'s [=AISummarizerCapabilities/available languages=][|languageTag|], or "{{AICapabilityAvailability/no}}" if no such [=map/entry=] [=map/exists=].
+  1. If [$IsStructurallyValidLanguageTag$](|languageTag|) is false, then throw a {{TypeError}}.
 
-  <p class="issue">Per <a href="https://github.com/WICG/translation-api/issues/11">WICG/translation-api#11</a> it seems we're supposed to do something more complex than just straight string comparison for language tags, but it's not clear what.</p>
+  1. Set |languageTag| to [$CanonicalizeUnicodeLocaleId$](|languageTag|).
+
+  1. Let |bestReadilyAvailableMatch| be [$LookupMatchingLocaleByBestFit$]([=this=]'s [=AISummarizerCapabilities/readily available languages=], |languageTag|).
+
+  1. If |bestReadilyAvailableMatch| is not undefined, then return "{{AICapabilityAvailability/readily}}".
+
+     <p class="note">|bestReadilyAvailableMatch|.\[[locale]] contains the actual language tag from [=this=]'s [=AISummarizerCapabilities/readily available languages=], which might be different from |languageTag|.
+
+  1. Let |bestAfterDownloadAvailableMatch| be [$LookupMatchingLocaleByBestFit$]([=this=]'s [=AISummarizerCapabilities/after-download available languages=], |languageTag|).
+
+  1. If |bestAfterDownloadAvailableMatch| is not undefined, then return "{{AICapabilityAvailability/after-download}}".
+
+     <p class="note">|bestAfterDownloadAvailableMatch|.\[[locale]] contains the actual language tag from [=this=]'s [=AISummarizerCapabilities/after-download available languages=], which might be different from |languageTag|.
+
+  1. Return "{{AICapabilityAvailability/no}}".
 </div>
 
 <hr>
@@ -413,27 +441,66 @@ Every {{AISummarizerCapabilities}} has an <dfn for="AISummarizerCapabilities">av
 </div>
 
 <div algorithm>
-  The <dfn>current summarizer language availability map</dfn> is given by the following steps. They return a [=map=] from strings representing BCP 47 language tags to {{AICapabilityAvailability}} values, or null. [[!RFC5646]]
+  The <dfn>current summarizer language availabilities</dfn> are given by the following steps. They return a [=list=] containing two [=list/items=]; the items each are [=sets=] of strings representing [=Unicode canonicalized locale identifier=], or null. [[!ECMA-402]]
 
   1. [=Assert=]: this algorithm is running [=in parallel=].
 
-  1. If there is some error attempting to determine whether the user agent supports summarizing text, which the user agent believes to be transient (such that re-querying the [=current summarizer create options availability=] could stop producing such an error), then return null.
+  1. If there is some error attempting to determine whether the user agent supports summarizing text, which the user agent believes to be transient (such that re-querying the [=current summarizer language availabilities=] could stop producing such an error), then return « null, null ».
 
-  1. Let |availableLanguages| be an empty [=map=].
+  1. Let |readilyAvailableLanguages| and |afterDownloadAvailableLanguages| be empty [=sets=].
 
-  1. [=list/For each=] human language for which the user agent supports summarizing text written in that language, without performing any downloading operations:
+  1. [=list/For each=] human language |languageTag|, represented as a [=Unicode canonicalized locale identifier=], for which the user agent supports summarizing text written in that language, without performing any downloading operations:
 
-    1. Let |languageTag| be that language, represented as a BCP 47 language tag string. <span class="issue">Describe how to handle subtags.</span>
+    1. [=set/Append=] |languageTag| to |readilyAvailableLanguages|.
 
-    1. Set |availableLanguages|[|languageTag|] to "{{AICapabilityAvailability/readily}}".
+  1. [=list/For each=] human language |languageTag|, represented as a [=Unicode canonicalized locale identifier=], for which the user agent believes it can summarize text written in that language, but only after performing a download (e.g., of an AI model or fine-tuning):
 
-  1. [=list/For each=] human language for which the user agent believes it can summarize text written in that language, but only after performing a download (e.g., of an AI model or fine-tuning):
+    1. [=Assert=]: |readilyAvailableLanguages| does not [=set/contain=] |languageTag|.
 
-    1. Let |languageTag| be that language, represented as a BCP 47 language tag string. <span class="issue">Describe how to handle subtags.</span>
+    1. [=set/Append=] |languageTag| to |afterDownloadAvailableLanguages|.
 
-    1. Set |availableLanguages|[|languageTag|] to "{{AICapabilityAvailability/after-download}}".
+  1. If the [=set/union=] of |readilyAvailableLanguages| and |afterDownloadAvailableLanguages| does not meet the [=language tag set completeness rules=], then:
 
-  1. Return |availableLanguages|.
+    1. Let |missingLanguageTags| be the [=set=] of missing language tags necessary to meet the [=language tag set completeness rules=].
+
+    1. [=set/For each=] |languageTag| of |missingLanguageTags|:
+
+      1. <span id="readily-or-after-download-implementation-defined"></span> [=set/Append=] |languageTag| to either |readilyAvailableLanguages| or |afterDownloadAvailableLanguages|. Which of the two sets to append to is [=implementation-defined=], and should be guided by considerations similar to that of [$LookupMatchingLocaleByBestFit$] in terms of keeping "best fallback languages" together.
+
+  1. Return « |readilyAvailableLanguages|, |afterDownloadAvailableLanguages| ».
+</div>
+
+<div algorithm>
+  The <dfn>language tag set completeness rules</dfn> state that for every [=set/item=] |languageTag|, if |languageTag| has more than one subtag, then the set must also contain a less narrow language tag with the same language subtag and a strict subset of the same following subtags (i.e., omitting one or more).
+
+  <p class="note">This definition is intended to align with that of [=[[AvailableLocales]]=] in <cite>ECMAScript Internationalization API Specification</cite>. [[ECMA-402]]
+
+  <div class="example" id="example-subtags-intro">
+    This means that if an implementation supports summarization of "`de-DE`" text, it will also count as supporting "`de`" text.
+
+    The converse direction is supported not by the [=language tag set completeness rules=], but instead by the use of [$LookupMatchingLocaleByBestFit$], which ensures that if an implementation supports summarizing "`de`" text, it also counts as supporting summarization of "`de-CH`", "`de-Latn-CH`", etc.
+  </div>
+
+  <div class="example" id="example-subtags-chinese">
+    A common setup seen in today's software is to support two types of written Chinese: "traditional Chinese" and "simplified Chinese". Let's suppose that the user agent supports summarizing text written in traditional Chinese readily, and simplified Chinese after a download.
+
+    One way this could be implemented would be for [=current summarizer language availabilities=] to return that « "`zh-Hant`" » is readily available, and « "`zh`", "`zh-Hans`" » is available after download. This return value conforms to the requirements of the [=language tag set completeness rules=], in ensuring that "`zh`" is present. Per <a class="allow-2119" href="#readily-or-after-download-implementation-defined">the "should"-level guidance</a>, the implementation has determined that "`zh`" belongs in the list of after-download available languages, with "`zh-Hans`", instead of in the list of readily available languages, with "`zh-Hant`".
+
+    Combined with the use of [$LookupMatchingLocaleByBestFit$], this means the the {{AISummarizerCapabilities/languageAvailable()}} will give the the following answers:
+
+    <xmp class="language-js">
+    c.languageAvailable("zh") === "after-download";
+    c.languageAvailable("zh-Hant") === "readily";
+    c.languageAvailable("zh-Hans") === "after-download";
+
+    c.languageAvailable("zh-TW") === "readily";          // zh-TW will best-fit to zh-Hant
+    c.languageAvailable("zh-HK") === "readily";          // zh-HK will best-fit to zh-Hant
+    c.languageAvailable("zh-CN") === "after-download";   // zh-CN will best-fit to zh-Hans
+
+    c.languageAvailable("zh-BR") === "after-download";   // zh-BR will best-fit to zh
+    c.languageAvailable("zh-Kana") === "after-download"; // zh-Kana will best-fit to zh
+    </xmp>
+  </div>
 </div>
 
 <h3 id="summarizer-object">Summarization</h3>
