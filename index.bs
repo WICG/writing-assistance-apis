@@ -488,7 +488,7 @@ Every {{AISummarizerCapabilities}} has an <dfn for="AISummarizerCapabilities">af
 
     One way this could be implemented would be for [=current summarizer language availabilities=] to return that « "`zh-Hant`" » is readily available, and « "`zh`", "`zh-Hans`" » is available after download. This return value conforms to the requirements of the [=language tag set completeness rules=], in ensuring that "`zh`" is present. Per <a class="allow-2119" href="#readily-or-after-download-implementation-defined">the "should"-level guidance</a>, the implementation has determined that "`zh`" belongs in the list of after-download available languages, with "`zh-Hans`", instead of in the list of readily available languages, with "`zh-Hant`".
 
-    Combined with the use of [$LookupMatchingLocaleByBestFit$], this means the the {{AISummarizerCapabilities/languageAvailable()}} will give the the following answers:
+    Combined with the use of [$LookupMatchingLocaleByBestFit$], this means {{AISummarizerCapabilities/languageAvailable()}} will give the following answers:
 
     <xmp class="language-js">
     c.languageAvailable("zh") === "after-download";
@@ -795,7 +795,7 @@ This section gives normative guidance on how the implementation of [=summarize=]
     <tr>
       <th>"<dfn enum-value for="AISummarizerType">teaser</dfn>"
       <td>
-        <p>The summary should focus on the most interesting or intriguing parts of the input, designed to draw the the reader in to read more.
+        <p>The summary should focus on the most interesting or intriguing parts of the input, designed to draw the reader in to read more.
     <tr>
       <th>"<dfn enum-value for="AISummarizerType">key-points</dfn>"
       <td>
@@ -803,7 +803,7 @@ This section gives normative guidance on how the implementation of [=summarize=]
     <tr>
       <th>"<dfn enum-value for="AISummarizerType">headline</dfn>"
       <td>
-        <p>The summary should effectively containing the main point of the input in a single sentence, in the format of an article headline.
+        <p>The summary should effectively contain the main point of the input in a single sentence, in the format of an article headline.
 </table>
 
 <table class="data enum-table">
@@ -821,7 +821,7 @@ This section gives normative guidance on how the implementation of [=summarize=]
         <dl class="switch">
           : "{{AISummarizerType/tl;dr}}"
           : "{{AISummarizerType/teaser}}"
-          :: The summary should fit within a one sentence.
+          :: The summary should fit within 1 sentence.
           : "{{AISummarizerType/key-points}}"
           :: The summary should consist of no more than 3 bullet points.
           : "{{AISummarizerType/headline}}"
@@ -835,7 +835,7 @@ This section gives normative guidance on how the implementation of [=summarize=]
         <dl class="switch">
           : "{{AISummarizerType/tl;dr}}"
           : "{{AISummarizerType/teaser}}"
-          :: The summary should fit within a one short paragraph.
+          :: The summary should fit within 1 short paragraph.
           : "{{AISummarizerType/key-points}}"
           :: The summary should consist of no more than 5 bullet points.
           : "{{AISummarizerType/headline}}"
@@ -849,13 +849,15 @@ This section gives normative guidance on how the implementation of [=summarize=]
         <dl class="switch">
           : "{{AISummarizerType/tl;dr}}"
           : "{{AISummarizerType/teaser}}"
-          :: The summary should fit within a one paragraph.
+          :: The summary should fit within 1 paragraph.
           : "{{AISummarizerType/key-points}}"
           :: The summary should consist of no more than 7 bullet points.
           : "{{AISummarizerType/headline}}"
           :: The summary should use no more than 22 words.
         </dl>
 </table>
+
+<p class="note">As with all "<span class="ignore-2119">should"-level guidance, user agents might not conform perfectly to these. Especially in the case of counting words, it's expected that language models might not conform perfectly.
 
 <table class="data enum-table">
   <caption>{{AISummarizerFormat}} values</caption>
