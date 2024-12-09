@@ -3,9 +3,9 @@ Title: Writing Assistance APIs
 Shortname: writing-assistance
 Level: None
 Status: CG-DRAFT
-Group: WICG
-Repository: WICG/writing-assistance-apis
-URL: https://wicg.github.io/writing-assistance-apis
+Group: webml
+Repository: webmachinelearning/writing-assistance-apis
+URL: https://webmachinelearning.github.io/writing-assistance-apis
 Editor: Domenic Denicola, Google https://www.google.com/, d@domenic.me, https://domenic.me/
 Abstract: The summarizer, writer, and rewriter APIs provide high-level interfaces to call on a browser or operating system's built-in language model to help with writing tasks.
 Markup Shorthands: markdown yes, css no
