@@ -4,7 +4,7 @@
 
 Browsers and operating systems are increasingly expected to gain access to a language model. ([Example](https://developer.chrome.com/docs/ai/built-in), [example](https://blogs.windows.com/windowsdeveloper/2024/05/21/unlock-a-new-era-of-innovation-with-windows-copilot-runtime-and-copilot-pcs/), [example](https://www.apple.com/apple-intelligence/).) Web applications can benefit from using language models for a variety of [use cases](#use-cases).
 
-The exploratory [prompt API](https://github.com/explainers-by-googlers/prompt-api/) exposes such language models directly, requiring developers to do [prompt engineering](https://developers.google.com/machine-learning/resources/prompt-eng). The APIs in this explainer expose specific higher-level functionality for assistance with writing. Specifically:
+The exploratory [prompt API](https://github.com/webmachinelearning/prompt-api/) exposes such language models directly, requiring developers to do [prompt engineering](https://developers.google.com/machine-learning/resources/prompt-eng). The APIs in this explainer expose specific higher-level functionality for assistance with writing. Specifically:
 
 * The **summarizer** API produces summaries of input text;
 * The **writer** API writes new material, given a writing task prompt;
@@ -237,7 +237,7 @@ In all cases, the exception used for rejecting promises or erroring `ReadableStr
 
 Notably, this is the best place to find all the possible creation-time options for each API, as well as their possible values.
 
-The API design here is synchronized with [that of the translation and language detection APIs](https://github.com/WICG/translation-api/blob/main/README.md#full-api-surface-in-web-idl), as well as the still-extremely-experimental [prompt API](https://github.com/explainers-by-googlers/prompt-api/blob/main/README.md#full-api-surface-in-web-idl).
+The API design here is synchronized with [that of the translation and language detection APIs](https://github.com/webmachinelearning/translation-api/blob/main/README.md#full-api-surface-in-web-idl), as well as the still-extremely-experimental [prompt API](https://github.com/webmachinelearning/prompt-api/blob/main/README.md#full-api-surface-in-web-idl).
 
 ```webidl
 // Shared self.ai APIs
@@ -258,7 +258,7 @@ interface AICreateMonitor : EventTarget {
   attribute EventHandler ondownloadprogress;
 
   // Might get more stuff in the future, e.g. for
-  // https://github.com/explainers-by-googlers/prompt-api/issues/4
+  // https://github.com/webmachinelearning/prompt-api/issues/4
 };
 
 callback AICreateMonitorCallback = undefined (AICreateMonitor monitor);
@@ -490,15 +490,15 @@ However, we believe that streaming input would not be a good fit for these APIs.
 
 In [the TAG review of the translation and language detection APIs](https://github.com/w3ctag/design-reviews/issues/948), some TAG members suggested slightly different patterns than the `ai.something.create()` + `ai.something.capabilities()` pattern, such as `AISomething.create()` + `AISomething.capabilities()`, or `Something.create()` + `Something.capabilities()`.
 
-Similarly, in [an issue on the translation and language detection APIs repository](https://github.com/WICG/translation-api/issues/12), a member of the W3C Internationalization Working Group suggested that the word "readily" might not be understood easily by non-native English speakers, and something less informative but more common (such as "yes") might be better. And in [another issue](https://github.com/WICG/translation-api/issues/7), we're wondering if the empty string would be better than `"no"`, since the empty string is falsy.
+Similarly, in [an issue on the translation and language detection APIs repository](https://github.com/webmachinelearning/translation-api/issues/12), a member of the W3C Internationalization Working Group suggested that the word "readily" might not be understood easily by non-native English speakers, and something less informative but more common (such as "yes") might be better. And in [another issue](https://github.com/webmachinelearning/translation-api/issues/7), we're wondering if the empty string would be better than `"no"`, since the empty string is falsy.
 
 We are open to such surface-level tweaks to the API entry points, and intend to gather more data from web developers on what they find more understandable and clear.
 
 ### Directly exposing a "prompt API"
 
-The same team that is working on these APIs is also prototyping an experimental [prompt API](https://github.com/explainers-by-googlers/prompt-api/). A natural question is how these efforts related. Couldn't one easily accomplish summarization/writing/rewriting by directly prompting a language model, thus making these higher-level APIs redundant?
+The same team that is working on these APIs is also prototyping an experimental [prompt API](https://github.com/webmachinelearning/prompt-api/). A natural question is how these efforts related. Couldn't one easily accomplish summarization/writing/rewriting by directly prompting a language model, thus making these higher-level APIs redundant?
 
-We currently believe higher-level APIs have a better chance of producing interoperability, as they make it more difficult to rely on the specifics of a model's capabilities, knowledge, or output formatting. [explainers-by-googlers/prompt-api#35](https://github.com/explainers-by-googlers/prompt-api/issues/35) contains specific illustrations of the potential interoperability problems with a raw prompt API. (It also contains a possible solution, which we are exploring!) When only specific use cases are targeted, implementations can more predictably produce similar output, that always works well enough to be usable by web developers regardless of which implementation is in play. This is similar to how other APIs backed by machine learning models work, such as the [shape detection API](https://wicg.github.io/shape-detection-api/) or the proposed [translator and language detector APIs](https://github.com/WICG/translation-api).
+We currently believe higher-level APIs have a better chance of producing interoperability, as they make it more difficult to rely on the specifics of a model's capabilities, knowledge, or output formatting. [webmachinelearning/prompt-api#35](https://github.com/webmachinelearning/prompt-api/issues/35) contains specific illustrations of the potential interoperability problems with a raw prompt API. (It also contains a possible solution, which we are exploring!) When only specific use cases are targeted, implementations can more predictably produce similar output, that always works well enough to be usable by web developers regardless of which implementation is in play. This is similar to how other APIs backed by machine learning models work, such as the [shape detection API](https://wicg.github.io/shape-detection-api/) or the proposed [translator and language detector APIs](https://github.com/webmachinelearning/translation-api).
 
 Another reason to favor higher-level APIs is that it is possible to produce better results with them than with a raw prompt API, by fine-tuning the model on the specific tasks and configurations that are offered. They can also encapsulate the application of more advanced techniques, e.g. hierarchical summarization and prefix caching; see [this comment](https://github.com/WICG/proposals/issues/163#issuecomment-2297913033) from a web developer regarding their experience of the complexity of real-world summarization tasks.
 
