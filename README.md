@@ -181,21 +181,20 @@ All APIs are customizable during their `create()` calls, with various options. I
 
 However, not all models will necessarily support every language or option value. Or if they do, it might require a download to get the appropriate fine-tuning or other collateral necessary. Similarly, an API might not be supported at all, or might require a download on the first use.
 
-In the simple case, web developers should call `create()`, and handle failures gracefully. However, if they want to provide a differentiated user experience, which lets users know ahead of time that the feature will not be possible or might require a download, they can use each API's promise-returning `capabilities()` method. The `capabilities()` method lets developers know, before calling `create()`, what is possible with the implementation.
+In the simple case, web developers should call `create()`, and handle failures gracefully. However, if they want to provide a differentiated user experience, which lets users know ahead of time that the feature will not be possible or might require a download, they can use each API's promise-returning `createOptionsAvailable()` method. This method lets developers know, before calling `create()`, what is possible with the implementation.
 
-The capabilities object that the promise fulfills with has an available property which is one of "`no`", "`after-download`", or "`readily`":
+The method will return a promise that fulfills with one of the following availability values:
 
-* "`no`" means that the implementation does not support the requested API.
-* "`after-download`" means that the implementation supports the API, but it will have to download something (e.g. a machine learning model or fine-tuning) before it can do anything.
-* "`readily`" means that the implementation supports the API, and at least the default functionality is available without any downloads.
+* "`no`" means that the implementation does not support the requested options.
+* "`after-download`" means that the implementation supports the requested options, but it will have to download something (e.g. a machine learning model or fine-tuning) before it can do anything.
+* "`readily`" means that the implementation supports the request options without requiring any new downloads.
 
-Each of these capabilities objects has a further method, `createOptionsAvailable()`, which allow probing the specific options supported (including languages). These methods return the same three possible values. For example:
+An example usage is the following:
 
 ```js
 const options = { type: "teaser", expectedInputLanguages: ["ja"] };
 
-const summarizerCapabilities = await ai.summarizer.capabilities();
-const supportsOurUseCase = summarizerCapabilities.createOptionsAvailable(options);
+const supportsOurUseCase = await ai.summarizer.createOptionsAvailable(options);
 
 if (supportsOurUseCase !== "no") {
   // We're good! Let's do the summarization using the built-in API.
@@ -275,19 +274,9 @@ Based on the [use cases](#use-cases), it seems many web developers are excited t
 
 We understand this to be an active research area (on both sides), and it will be hard to specify concrete for these APIs. Nevertheless, we want to highlight this possibility and will include "should"-level language and examples in the specification to encourage implementations to be robust to such adversarial inputs.
 
-### Capabilities
+### `"after-download"` availability
 
-The capabilities API [exemplified above](#capabilities) has various invariants:
-
-* If the overall API is not available, then `available` must be `"no"`, and all methods must return `"no"`.
-* Otherwise, if `available` is `"after-download"`, then all methods must return either `"no"` or `"after-download"`. (They must not return `"readily"` if the overall capability is not yet downloaded.)
-* Otherwise, if `available` is `"readily"`, then the methods may return any of the three values `"no"`, `"after-download"`, or `"readily"`.
-
-The capabilities object is somewhat "live", in that causing downloads via calls to `create()` must update all capabilities object instances that exist for the current global object. (Or equivalently, the current associated factory object.)
-
-However, the capabilities object does *not* proactively update in response to what happens in other global objects, e.g. if some other tab creates a summarizer and causes the model to download.
-
-Note that to ensure that the browser can give accurate answers while `available` is `"after-download"`, the browser must ship some notion of what types/formats/input languages/etc. are available with the browser. In other words, the browser cannot download this information at the same time it downloads the language model. This could be done either by bundling that information with the browser binary, or via some out-of-band update mechanism that proactively stays up to date.
+To ensure that the browser can give accurate answers about which options are available `"after-download"`, it must ship with some notion of what types/formats/input languages/etc. are available to download. In other words, the browser cannot download this information at the same time it downloads the language model. This could be done either by bundling that information with the browser binary, or via some out-of-band update mechanism that proactively stays up to date.
 
 ### Specifications and tests
 
@@ -320,7 +309,7 @@ The [Basic usage](#basic-usage) examples show how getting output from these APIs
 
 This is possible, but it would require implementations to do behind-the-scenes magic to get efficient results, and that magic would sometimes fail, causing inefficient usage of the user's computing resources. This is because the creation and destruction of the summarizer objects provides an important signal to the implementation about when it should load and unload a language model into or from memory. (Recall that these language models are generally multiple gigabytes in size.) If we loaded and unloaded it for every `summarize()` call, the result would be very wasteful. If we relied on the browser to have heuristics, e.g. to try keeping the model in memory for some timeout period, we could reduce the waste, but since the browser doesn't know exactly how long the web page plans to keep summarizing, there will still be cases where the model is unloaded too late or too early compared to the optimal timing.
 
-The two-step approach has additional benefits for cases where a site is doing the same operation with the same configuration multiple times. (E.g. on multiple articles, reviews, or message drafts.) It allows the implementation to prime the model with any appropriate fine-tunings or context to help it conform to the requested output options, and thus get faster responses for individual calls. An example of this is [shown above](#repeated-usage)
+The two-step approach has additional benefits for cases where a site is doing the same operation with the same configuration multiple times. (E.g. on multiple articles, reviews, or message drafts.) It allows the implementation to prime the model with any appropriate fine-tunings or context to help it conform to the requested output options, and thus get faster responses for individual calls. An example of this is [shown above](#repeated-usage).
 
 **Note that the created summarizer/etc. objects are essentially stateless: individual calls to `summarize()` do not build on or interfere with each other.**
 
@@ -332,7 +321,7 @@ However, we believe that streaming input would not be a good fit for these APIs.
 
 ### Alternative API spellings
 
-In [the TAG review of the translation and language detection APIs](https://github.com/w3ctag/design-reviews/issues/948), some TAG members suggested slightly different patterns than the `ai.something.create()` + `ai.something.capabilities()` pattern, such as `AISomething.create()` + `AISomething.capabilities()`, or `Something.create()` + `Something.capabilities()`.
+In [the TAG review of the translation and language detection APIs](https://github.com/w3ctag/design-reviews/issues/948), some TAG members suggested slightly different patterns than the `ai.something.create()` pattern, such as `AISomething.create()` or `Something.create()`.
 
 Similarly, in [an issue on the translation and language detection APIs repository](https://github.com/webmachinelearning/translation-api/issues/12), a member of the W3C Internationalization Working Group suggested that the word "readily" might not be understood easily by non-native English speakers, and something less informative but more common (such as "yes") might be better. And in [another issue](https://github.com/webmachinelearning/translation-api/issues/7), we're wondering if the empty string would be better than `"no"`, since the empty string is falsy.
 
@@ -358,9 +347,9 @@ If on-device language models are updated separately from browser and operating s
 
 Finally, we intend to prohibit (in the specification) any use of user-specific information that is not directly supplied through the API. For example, it would not be permissible to fine-tune the language model based on information the user has entered into the browser in the past.
 
-### The capabilities APIs
+### Detecting available options
 
-The [capabilities APIs](#capabilities) specified here provide some bits of fingerprinting information, since the availability status of each API and each API's options can be one of three values, and those values are expected to be shared across a user's browser or browsing profile. In theory, taking into account the [invariants](#capabilities-1), this could be up to ~5.5 bits for the current set of summarizer options, plus an unknown number more based on the number of supported languages, and then this would be roughly tripled by including writer and rewriter.
+The [`createOptionsAvailable()` API](#testing-available-options-before-creation) specified here provide some bits of fingerprinting information, since the availability status of each option and language can be one of three values, and those values are expected to be shared across a user's browser or browsing profile. In theory, this could be up to ~5.5 bits for the current set of summarizer options, plus an unknown number more based on the number of supported languages, and then this would be roughly tripled by including writer and rewriter.
 
 In practice, we expect the number of bits to be much smaller, as implementations will likely not have separate, independently-downloadable pieces of collateral for each option value. (For example, in Chrome's case, we anticipate having a single download for all three APIs.) But we need the API design to be robust to a variety of implementation choices, and have purposefully designed it to allow such independent-download architectures so as not to lock implementers into a single strategy.
 
