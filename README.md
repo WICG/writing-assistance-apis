@@ -143,38 +143,74 @@ const reviewSummaries = await Promise.all(
 );
 ```
 
+### Multilingual content and expected languages
+
+The default behavior for the summarizer/writer/rewriter objects assumes that the input language and context languages are unknown, and that the developer wants the output language to be the same as the input language. In this case, implementations will use whatever "base" capabilities they have available for these operations, and might throw `"NotSupportedError"` `DOMException`s if they encounter languages they don't support.
+
+It's better practice, if possible, to supply the `create()` method with information about the expected languages in use. This allows the implementation to download any necessary supporting material, such as fine-tunings or safety-checking models, and to immediately reject the promise returned by `create()` if the web developer needs to use languages that the browser is not capable of supporting:
+
+```js
+const summarizer = await ai.summarize.create({
+  type: "key-points",
+  expectedInputLanguages: ["ja", "kr"],
+  expectedContextLanguages: ["en", "ja", "kr"],
+  outputLanguage: "zh",
+  sharedContext: `
+    These are messages from a language exchange platform managed by a Chinese educational
+    technology company. Staff need to monitor exchanges to improve the platform's
+    learning resources and language pair recommendations.
+  `
+});
+
+const summary = await summarizer.summarize(`
+  田中: 来週から韓国の会社で働くことになりました。オフィスでよく使う表現を教えていただけませんか？
+  박준호: 축하드려요! 사무실에서 자주 쓰는 표현 알려드릴게요. 먼저 '회의(회의실)'는 미팅룸이에요.
+  田中: なるほど！とても助かります。他にもぜひ教えてください。
+`, {
+  context: `Message from 2024-12-06 titled "韓国語の職場用語について"`
+});
+
+console.log(summary); // will be in Chinese
+```
+
+If the `outputLanguage` is not supplied, the default behavior is to produce the output in "the same language as the input". For the multilingual input case, what this means is left implementation-defined for now, and implementations should err on the side of rejecting with a `"NotSupportedError"` `DOMException`. For this reason, it's strongly recommended that developers supply `outputLanguage`.
+
 ### Capabilities
 
-All APIs are customizable during their `create()` calls, with various options. These are given in more detail in the [Full API surface in Web IDL](#full-api-surface-in-web-idl) section. However, not all models will necessarily support every option value. Or if they do, it might require a download to get the appropriate fine-tuning or other collateral necessary. Similarly, an API might not be supported at all, or might require a download on the first use.
+All APIs are customizable during their `create()` calls, with various options. In addition to the language options above, the others are given in more detail in [the spec](https://wicg.github.io/writing-assistance-apis/).
 
-This is handled by each API with a promise-returning `capabilities()` method, which lets you know, before calling `create()`, what is possible with the implementation. The capabilities object that the promise fulfills with has an available property which is one of "`no`", "`after-download`", or "`readily`":
+However, not all models will necessarily support every language or option value. Or if they do, it might require a download to get the appropriate fine-tuning or other collateral necessary. Similarly, an API might not be supported at all, or might require a download on the first use.
+
+In the simple case, web developers should call `create()`, and handle failures gracefully. However, if they want to provide a differentiated user experience, which lets users know ahead of time that the feature will not be possible or might require a download, they can use each API's promise-returning `capabilities()` method. The `capabilities()` method lets developers know, before calling `create()`, what is possible with the implementation.
+
+The capabilities object that the promise fulfills with has an available property which is one of "`no`", "`after-download`", or "`readily`":
 
 * "`no`" means that the implementation does not support the requested API.
 * "`after-download`" means that the implementation supports the API, but it will have to download something (e.g. a machine learning model or fine-tuning) before it can do anything.
 * "`readily`" means that the implementation supports the API, and at least the default functionality is available without any downloads.
 
-Each of these capabilities objects has further methods which allow probing the specific options supported. These methods return the same three possible values. For example:
+Each of these capabilities objects has a further method, `createOptionsAvailable()`, which allow probing the specific options supported (including languages). These methods return the same three possible values. For example:
 
 ```js
-const summarizerCapabilities = await ai.summarizer.capabilities();
-const supportsTeaser = summarizerCapabilities.createOptionsAvailable({ type: "teaser" });
+const options = { type: "teaser", expectedInputLanguages: ["ja"] };
 
-if (supportsTeaser !== "no") {
+const summarizerCapabilities = await ai.summarizer.capabilities();
+const supportsOurUseCase = summarizerCapabilities.createOptionsAvailable(options);
+
+if (supportsOurUseCase !== "no") {
   // We're good! Let's do the summarization using the built-in API.
-  if (supportsTeaser === "after-download") {
+  if (supportsOurUseCase === "after-download") {
     console.log("Sit tight, we need to do some downloading...");
   }
 
-  const summarizer = await ai.summarizer.create({ type: "teaser" });
+  const summarizer = await ai.summarizer.create(options);
   console.log(await summarizer.summarize(articleEl.textContent));
 } else {
-  // Either the API overall, or the teaser type, is not available.
+  // Either the API overall, or the combination of teaser + Japanese input, is not available.
   // Use the cloud.
-  console.log(await doCloudSummarization(articleEl.textContent);
+  console.log(await doCloudSummarization(articleEl.textContent));
 }
 ```
-
-In addition to methods to check if options (like `type` for summarizer, or `tone` for rewriter) are supported, all three APIs' capabilities objects have an additional method, `languageAvailable(languageTag)`, which can be used to tell whether the model supports input and context in the given human language. It has the same three return values.
 
 ### Download progress
 
@@ -232,198 +268,6 @@ Aborting the creation process will reject the promise returned by `create()`, an
 In all cases, the exception used for rejecting promises or erroring `ReadableStream`s will be an `"AbortError"` `DOMException`, or the given abort reason.
 
 ## Detailed design
-
-### Full API surface in Web IDL
-
-Notably, this is the best place to find all the possible creation-time options for each API, as well as their possible values.
-
-The API design here is synchronized with [that of the translation and language detection APIs](https://github.com/webmachinelearning/translation-api/blob/main/README.md#full-api-surface-in-web-idl), as well as the still-extremely-experimental [prompt API](https://github.com/webmachinelearning/prompt-api/blob/main/README.md#full-api-surface-in-web-idl).
-
-```webidl
-// Shared self.ai APIs
-
-partial interface WindowOrWorkerGlobalScope {
-  [Replaceable, SecureContext] readonly attribute AI ai;
-};
-
-[Exposed=(Window,Worker), SecureContext]
-interface AI {
-  readonly attribute AISummarizerFactory summarizer;
-  readonly attribute AIWriterFactory writer;
-  readonly attribute AIRewriterFactory rewriter;
-};
-
-[Exposed=(Window,Worker), SecureContext]
-interface AICreateMonitor : EventTarget {
-  attribute EventHandler ondownloadprogress;
-
-  // Might get more stuff in the future, e.g. for
-  // https://github.com/webmachinelearning/prompt-api/issues/4
-};
-
-callback AICreateMonitorCallback = undefined (AICreateMonitor monitor);
-
-enum AICapabilityAvailability { "readily", "after-download", "no" };
-```
-
-```webidl
-// Summarizer
-
-[Exposed=(Window,Worker), SecureContext]
-interface AISummarizerFactory {
-  Promise<AISummarizer> create(optional AISummarizerCreateOptions options = {});
-  Promise<AISummarizerCapabilities> capabilities();
-};
-
-[Exposed=(Window,Worker), SecureContext]
-interface AISummarizer {
-  Promise<DOMString> summarize(DOMString input, optional AISummarizerSummarizeOptions options = {});
-  ReadableStream summarizeStreaming(DOMString input, optional AISummarizerSummarizeOptions options = {});
-
-  readonly attribute DOMString sharedContext;
-  readonly attribute AISummarizerType type;
-  readonly attribute AISummarizerFormat format;
-  readonly attribute AISummarizerLength length;
-
-  undefined destroy();
-};
-
-[Exposed=(Window,Worker), SecureContext]
-interface AISummarizerCapabilities {
-  readonly attribute AICapabilityAvailability available;
-
-  AICapabilityAvailability createOptionsAvailable(AISummarizerCreateCoreOptions options);
-  AICapabilityAvailability languageAvailable(DOMString languageTag);
-};
-
-dictionary AISummarizerCreateCoreOptions {
-  AISummarizerType type = "key-points";
-  AISummarizerFormat format = "markdown";
-  AISummarizerLength length = "short";
-};
-
-dictionary AISummarizerCreateOptions : AISummarizerCreateCoreOptions {
-  AbortSignal signal;
-  AICreateMonitorCallback monitor;
-
-  DOMString sharedContext;
-};
-
-dictionary AISummarizerSummarizeOptions {
-  AbortSignal signal;
-  DOMString context;
-};
-
-enum AISummarizerType { "tl;dr", "key-points", "teaser", "headline" };
-enum AISummarizerFormat { "plain-text", "markdown" };
-enum AISummarizerLength { "short", "medium", "long" };
-```
-
-```webidl
-// Writer
-
-[Exposed=(Window,Worker), SecureContext]
-interface AIWriterFactory {
-  Promise<AIWriter> create(optional AIWriterCreateOptions options = {});
-  Promise<AIWriterCapabilities> capabilities();
-};
-
-[Exposed=(Window,Worker), SecureContext]
-interface AIWriter {
-  Promise<DOMString> write(DOMString writingTask, optional AIWriterWriteOptions options = {});
-  ReadableStream writeStreaming(DOMString writingTask, optional AIWriterWriteOptions options = {});
-
-  readonly attribute DOMString sharedContext;
-  readonly attribute AIWriterTone tone;
-  readonly attribute AIWriterFormat format;
-  readonly attribute AIWriterLength length;
-
-  undefined destroy();
-};
-
-[Exposed=(Window,Worker), SecureContext]
-interface AIWriterCapabilities {
-  readonly attribute AICapabilityAvailability available;
-
-  AICapabilityAvailability createOptionsAvailable(AIWriterCreateCoreOptions options);
-  AICapabilityAvailability languageAvailable(DOMString languageTag);
-};
-
-dictionary AIWriterCreateCoreOptions {
-  AIWriterTone tone = "neutral",
-  AIWriterFormat format = "markdown",
-  AIWriterLength length = "short"
-};
-
-dictionary AIWriterCreateOptions : AIWriterCreateCoreOptions {
-  AbortSignal signal;
-  AICreateMonitorCallback monitor;
-
-  DOMString sharedContext;
-};
-
-dictionary AIWriterWriteOptions {
-  DOMString context;
-  AbortSignal signal;
-};
-
-enum AIWriterTone { "formal", "neutral", "casual" };
-enum AIWriterFormat { "plain-text", "markdown" };
-enum AIWriterLength { "short", "medium", "long" };
-```
-
-```webidl
-// Rewriter
-
-[Exposed=(Window,Worker), SecureContext]
-interface AIRewriterFactory {
-  Promise<AIRewriter> create(optional AIRewriterCreateOptions options = {});
-  Promise<AIRewriterCapabilities> capabilities();
-};
-
-[Exposed=(Window,Worker), SecureContext]
-interface AIRewriter {
-  Promise<DOMString> rewrite(DOMString input, optional AIRewriterRewriteOptions options = {});
-  ReadableStream rewriteStreaming(DOMString input, optional AIRewriterRewriteOptions options = {});
-
-  readonly attribute DOMString sharedContext;
-  readonly attribute AIRewriterTone tone;
-  readonly attribute AIRewriterFormat format;
-  readonly attribute AIRewriterLength length;
-
-  undefined destroy();
-};
-
-[Exposed=(Window,Worker), SecureContext]
-interface AIRewriterCapabilities {
-  readonly attribute AICapabilityAvailability available;
-
-  AICapabilityAvailability createOptionsAvailable(AIRewriterCreateCoreOptions options);
-  AICapabilityAvailability languageAvailable(DOMString languageTag);
-};
-
-dictionary AIRewriterCreateCoreOptions {
-  AIRewriterTone tone = "as-is";
-  AIRewriterFormat format = "as-is";
-  AIRewriterLength length = "as-is";
-};
-
-dictionary AIRewriterCreateOptions : AIRewriterCreateCoreOptions {
-  AbortSignal signal;
-  AICreateMonitorCallback monitor;
-
-  DOMString sharedContext;
-};
-
-dictionary AIRewriterRewriteOptions {
-  DOMString context;
-  AbortSignal signal;
-};
-
-enum AIRewriterTone { "as-is", "more-formal", "more-casual" };
-enum AIRewriterFormat { "as-is", "plain-text", "markdown" };
-enum AIRewriterLength { "as-is", "shorter", "longer" };
-```
 
 ### Robustness to adversarial inputs
 
