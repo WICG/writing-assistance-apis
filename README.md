@@ -175,9 +175,9 @@ console.log(summary); // will be in Chinese
 
 If the `outputLanguage` is not supplied, the default behavior is to produce the output in "the same language as the input". For the multilingual input case, what this means is left implementation-defined for now, and implementations should err on the side of rejecting with a `"NotSupportedError"` `DOMException`. For this reason, it's strongly recommended that developers supply `outputLanguage`.
 
-### Capabilities
+### Testing available options before creation
 
-All APIs are customizable during their `create()` calls, with various options. In addition to the language options above, the others are given in more detail in [the spec](https://wicg.github.io/writing-assistance-apis/).
+All APIs are customizable during their `create()` calls, with various options. In addition to the language options above, the others are given in more detail in [the spec](https://webmachinelearning.github.io/writing-assistance-apis/).
 
 However, not all models will necessarily support every language or option value. Or if they do, it might require a download to get the appropriate fine-tuning or other collateral necessary. Similarly, an API might not be supported at all, or might require a download on the first use.
 
