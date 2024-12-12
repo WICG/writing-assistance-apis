@@ -181,20 +181,20 @@ All APIs are customizable during their `create()` calls, with various options. I
 
 However, not all models will necessarily support every language or option value. Or if they do, it might require a download to get the appropriate fine-tuning or other collateral necessary. Similarly, an API might not be supported at all, or might require a download on the first use.
 
-In the simple case, web developers should call `create()`, and handle failures gracefully. However, if they want to provide a differentiated user experience, which lets users know ahead of time that the feature will not be possible or might require a download, they can use each API's promise-returning `createOptionsAvailable()` method. This method lets developers know, before calling `create()`, what is possible with the implementation.
+In the simple case, web developers should call `create()`, and handle failures gracefully. However, if they want to provide a differentiated user experience, which lets users know ahead of time that the feature will not be possible or might require a download, they can use each API's promise-returning `availability()` method. This method lets developers know, before calling `create()`, what is possible with the implementation.
 
 The method will return a promise that fulfills with one of the following availability values:
 
 * "`no`" means that the implementation does not support the requested options.
 * "`after-download`" means that the implementation supports the requested options, but it will have to download something (e.g. a machine learning model or fine-tuning) before it can do anything.
-* "`readily`" means that the implementation supports the request options without requiring any new downloads.
+* "`readily`" means that the implementation supports the requested options without requiring any new downloads.
 
 An example usage is the following:
 
 ```js
 const options = { type: "teaser", expectedInputLanguages: ["ja"] };
 
-const supportsOurUseCase = await ai.summarizer.createOptionsAvailable(options);
+const supportsOurUseCase = await ai.summarizer.availability(options);
 
 if (supportsOurUseCase !== "no") {
   // We're good! Let's do the summarization using the built-in API.
@@ -349,7 +349,7 @@ Finally, we intend to prohibit (in the specification) any use of user-specific i
 
 ### Detecting available options
 
-The [`createOptionsAvailable()` API](#testing-available-options-before-creation) specified here provide some bits of fingerprinting information, since the availability status of each option and language can be one of three values, and those values are expected to be shared across a user's browser or browsing profile. In theory, this could be up to ~5.5 bits for the current set of summarizer options, plus an unknown number more based on the number of supported languages, and then this would be roughly tripled by including writer and rewriter.
+The [`availability()` API](#testing-available-options-before-creation) specified here provide some bits of fingerprinting information, since the availability status of each option and language can be one of three values, and those values are expected to be shared across a user's browser or browsing profile. In theory, this could be up to ~5.5 bits for the current set of summarizer options, plus an unknown number more based on the number of supported languages, and then this would be roughly tripled by including writer and rewriter.
 
 In practice, we expect the number of bits to be much smaller, as implementations will likely not have separate, independently-downloadable pieces of collateral for each option value. (For example, in Chrome's case, we anticipate having a single download for all three APIs.) But we need the API design to be robust to a variety of implementation choices, and have purposefully designed it to allow such independent-download architectures so as not to lock implementers into a single strategy.
 
